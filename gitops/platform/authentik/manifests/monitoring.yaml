@@ -1,0 +1,30 @@
+---
+# Authentik server metrics (logins, flow executions, request latency) and its database.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: authentik
+  labels:
+    prometheus.homelab/instance: portfolio # skipped by the central Prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+      app.kubernetes.io/component: server-metrics
+  endpoints:
+    - port: metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: authentik-db
+  labels:
+    prometheus.homelab/instance: portfolio
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: authentik-db
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s

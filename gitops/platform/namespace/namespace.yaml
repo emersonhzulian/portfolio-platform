@@ -1,0 +1,12 @@
+---
+# Public-facing portfolio: its own Grafana, serving only published (public) dashboards, plus
+# its own Prometheus, Loki and Tempo that only ever hold data from this namespace. Nothing
+# here points at the cluster's own observability backends. See ../README.md.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: portfolio
+  annotations:
+    # Opt-in for Chaos Mesh (it only targets annotated namespaces): the scheduled experiments
+    # in ../../apps/chaos kill pods here to show the apps ride through it.
+    chaos-mesh.org/inject: enabled

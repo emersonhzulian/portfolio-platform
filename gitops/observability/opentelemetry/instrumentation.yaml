@@ -1,0 +1,42 @@
+---
+# Auto-instrumentation for apps in this namespace. It must be the *only* Instrumentation
+# here: pods opt in with a bare "true", which the operator resolves to the single
+# Instrumentation in the pod's namespace (with two it refuses to pick and injects nothing).
+# One resource covers every language:
+#   instrumentation.opentelemetry.io/inject-dotnet: "true"
+#     (Alpine images also need instrumentation.opentelemetry.io/otel-dotnet-auto-runtime: "linux-musl-x64")
+#   instrumentation.opentelemetry.io/inject-nodejs: "true"
+#     (log records need pino or bunyan: winston only ships over OTLP with
+#     @opentelemetry/winston-transport, which the operator's image doesn't include)
+# .NET log records come from Microsoft.Extensions.Logging (ILogger), built into the agent - no
+# package in the app. A logger that bypasses ILogger (e.g. Serilog straight to the console)
+# may send nothing over OTLP - check for scope_name/severity_text on its lines in Loki -
+# and otel-logs-portfolio drops instrumented pods' stdout.
+# yaml-language-server: $schema=https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/main/config/crd/bases/opentelemetry.io_instrumentations.yaml
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: default
+spec:
+  exporter:
+    endpoint: http://otel-portfolio-collector.portfolio.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: parentbased_always_on
+  # Logs and traces go to otel-portfolio; metrics stay off (Prometheus scrapes instead).
+  env:
+    - name: OTEL_LOGS_EXPORTER
+      value: otlp
+    - name: OTEL_TRACES_EXPORTER
+      value: otlp
+    - name: OTEL_METRICS_EXPORTER
+      value: none
+  dotnet:
+    env:
+      # Log body = the rendered message ("Content root path: /app") instead of the bare
+      # template ("Content root path: {ContentRoot}"). The values stay as attributes either
+      # way. Experimental in the agent (1.17.0), default false.
+      - name: OTEL_DOTNET_AUTO_LOGS_INCLUDE_FORMATTED_MESSAGE
+        value: "true"

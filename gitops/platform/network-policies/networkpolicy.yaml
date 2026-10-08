@@ -1,0 +1,297 @@
+---
+# Namespace lockdown, both directions. This namespace is the one part of the cluster that the
+# internet reaches, so its boundary is default-deny: anything crossing it - in or out - is
+# listed, and a new pod dropped in here gets nothing beyond DNS and its neighbours.
+#
+# Plain Kubernetes NetworkPolicy wherever it can say it. ciliumnetworkpolicy.yaml holds only
+# the three rules it can't: outbound by hostname, the API server and the kubelets.
+#
+# The model:
+#   - Inside the namespace, pods talk freely (apps -> collector -> Loki/Tempo -> Prometheus).
+#     The namespace is the trust boundary.
+#   - Grafana is the exception: it runs visitor-written queries, so it keeps its own, narrower
+#     policy (../../observability/grafana/networkpolicy.yaml) and is left out of
+#     `same-namespace`. Policies only ever add allows, so selecting it there would widen
+#     what it can reach.
+#
+# Kubelet probes come from the host and stay allowed (Cilium's default for host traffic).
+# Debug a dropped flow: `kubectl -n kube-system port-forward svc/hubble-relay 4245:80`, then
+# `hubble observe -n portfolio --verdict DROPPED`.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: same-namespace
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: NotIn
+        values: [grafana]
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Anything from inside the namespace (Grafana included, as a client of the datasources).
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
+---
+# The way in from the internet (Gateway/portfolio) and from the hosting cluster's private
+# gateway: both are Envoy Gateway proxies. Which hostnames and paths reach a pod is decided
+# by the HTTPRoutes; this only says which pods a proxy may reach at all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: from-gateways
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [landing, demo, gatus]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+# Prometheus: admin UI through the private gateway; scrapes the cluster's kube-state-metrics
+# and federates an allowlist from the central Prometheus.
+# (Kubelets and the API server: ciliumnetworkpolicy.yaml.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+      ports:
+        - port: 9090
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kube-state-metrics
+      ports:
+        - port: 8080
+          protocol: TCP
+    # /federate on the central Prometheus (allowlisted series only; see
+    # ../../observability/prometheus/servicemonitor-platform.yaml).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 9090
+          protocol: TCP
+---
+# Loki receives node logs from the shipper DaemonSet, which runs in the privileged
+# `opentelemetry` namespace (it needs hostPath; see ../../observability/opentelemetry).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: loki
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: opentelemetry
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: otel-logs-portfolio-collector
+      ports:
+        - port: 3100
+          protocol: TCP
+---
+# cloudflared: outbound-only tunnel to Cloudflare's edge, then into the portfolio gateway.
+# (Its HTTPS calls to Cloudflare by hostname: ciliumnetworkpolicy.yaml.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cloudflare-tunnel
+spec:
+  podSelector:
+    matchLabels:
+      app: cloudflare-tunnel
+  policyTypes: [Egress]
+  egress:
+    # Tunnel connections (QUIC, falling back to HTTP/2). The edge addresses come from SRV
+    # records and change, so this is by port: any public address, never a private one.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+      ports:
+        - port: 7844
+          protocol: UDP
+        - port: 7844
+          protocol: TCP
+    # The Envoy proxy behind Gateway/portfolio.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+      ports:
+        - port: 10443
+          protocol: TCP
+---
+# Redis also keeps the counters of the portfolio gateway's global rate limit, written by
+# Envoy Gateway's ratelimit service in envoy-gateway-system.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy-ratelimit
+      ports:
+        - port: 6379
+          protocol: TCP
+---
+# authentik's server is reached through the gateways (auth.emersonzulian.dev publicly, the
+# admin on the hosting cluster's private gateway).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: authentik
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+      app.kubernetes.io/component: server
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+      ports:
+        - port: 9000
+          protocol: TCP
+---
+# CloudNativePG's operator (namespace cnpg-system) manages its instances: status from the
+# instance manager, and Postgres itself for switchovers and backups.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cloudnative-pg
+spec:
+  podSelector:
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudnative-pg
+      ports:
+        - port: 8000
+          protocol: TCP
+        - port: 5432
+          protocol: TCP
+---
+# The shop's storefront, reached through the gateways (shop.emersonzulian.dev).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: shop-web
+spec:
+  podSelector:
+    matchLabels:
+      app: shop-web
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+      ports:
+        - port: 3000
+          protocol: TCP

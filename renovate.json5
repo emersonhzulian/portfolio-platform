@@ -1,0 +1,54 @@
+// Renovate keeps every version in this repository current: Helm charts and images in
+// gitops/, the shop's npm and NuGet packages, base images and the CI's actions. It runs from
+// the homelab (a self-hosted Renovate CronJob), on a schedule.
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    'docker:enableMajor',
+    ':dependencyDashboard',
+    ':timezone(UTC)',
+  ],
+  dependencyDashboardTitle: 'Renovate Dashboard 🤖',
+  rebaseWhen: 'always',
+  // No required status checks on this repository: Renovate merges the PR itself.
+  platformAutomerge: false,
+  internalChecksAsSuccess: true,
+  minimumReleaseAgeBehaviour: 'timestamp-optional',
+  ignoreUnstable: true,
+  // Plain Kubernetes manifests and Helm values live under gitops/; chart versions of the Argo
+  // CD Applications (spec.sources[].targetRevision) are read by the argocd manager.
+  kubernetes: {managerFilePatterns: ['/^gitops/.+\\.yaml$/']},
+  'helm-values': {managerFilePatterns: ['/^gitops/.+\\.yaml$/']},
+  argocd: {managerFilePatterns: ['/^gitops/argocd/.+\\.yaml$/']},
+  packageRules: [
+    {
+      description: 'Minor and patch updates merge themselves after 3 days (a window for a bad release to be noticed and pulled). Majors always wait for a review.',
+      matchUpdateTypes: ['minor', 'patch', 'digest'],
+      automerge: true,
+      automergeType: 'pr',
+      minimumReleaseAge: '3 days',
+    },
+    {
+      description: "0.x packages: a 'minor' bump may break anything (SemVer's initial-development rule), so it waits for a review like a major.",
+      matchCurrentVersion: '/^v?0\\./',
+      matchUpdateTypes: ['minor'],
+      automerge: false,
+    },
+    {
+      description: "The shop's own images (built by .github/workflows/shop.yml): merge new tags right away. The code was reviewed when it was merged; Argo Rollouts' canary analysis catches a bad build in production.",
+      matchDatasources: ['docker'],
+      matchPackageNames: ['/^ghcr\\.io/emersonhzulian/portfolio-platform//'],
+      automerge: true,
+      automergeType: 'pr',
+      minimumReleaseAge: null,
+    },
+    {
+      description: 'One PR per service for its npm or NuGet dependencies, instead of one per package.',
+      matchManagers: ['npm', 'nuget'],
+      matchFileNames: ['shop/**'],
+      groupName: 'shop {{packageFileDir}} dependencies',
+      matchUpdateTypes: ['minor', 'patch'],
+    },
+  ],
+}

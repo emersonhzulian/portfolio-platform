@@ -1,0 +1,45 @@
+---
+# auth.emersonzulian.dev: sign-up, login and the user's own settings. The admin interface
+# answers 404 here; the admin works on the private network (hosting cluster's LAN route).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: authentik
+  annotations:
+    external-dns.alpha.kubernetes.io/cloudflare: "true"
+spec:
+  parentRefs:
+    - name: portfolio
+      sectionName: https
+  hostnames:
+    - "auth.emersonzulian.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: authentik-server
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /if/admin
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: gateway.envoyproxy.io
+            kind: HTTPRouteFilter
+            name: authentik-not-found
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: authentik-not-found
+spec:
+  directResponse:
+    statusCode: 404
+    contentType: text/plain
+    body:
+      type: Inline
+      inline: "Not Found"

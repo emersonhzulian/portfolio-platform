@@ -1,0 +1,19 @@
+---
+# Only reachable through the Cloudflare tunnel (../cloudflare-tunnel), which dials this
+# Service from inside the cluster - so ClusterIP: no LB-IPAM pool, no l2-announce label,
+# nothing on the LAN. Fixed names so the tunnel's origin URL is stable:
+#   https://envoy-portfolio.envoy-gateway-system.svc.cluster.local:443
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: portfolio-proxy-config
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        name: envoy-portfolio
+        type: ClusterIP
+      envoyDeployment:
+        name: envoy-portfolio
+        replicas: 1

@@ -1,0 +1,67 @@
+---
+# cloudflared for the portfolio tunnel - the only way into Gateway/portfolio (../gateway).
+# The tunnel's public hostname (*.emersonzulian.dev -> envoy-portfolio) is configured on the
+# Cloudflare side; the token comes from externalsecret.yaml.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflare-tunnel-portfolio
+  labels:
+    app: cloudflare-tunnel
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudflare-tunnel
+  template:
+    metadata:
+      labels:
+        app: cloudflare-tunnel
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels:
+              app: cloudflare-tunnel
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:2026.10.0
+          command:
+            - cloudflared
+            - tunnel
+            - --metrics
+            - 0.0.0.0:2000
+            - run
+          args:
+            - --token
+            - $(TUNNEL_TOKEN)
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflare-tunnel-portfolio
+                  key: token
+          ports:
+            - containerPort: 2000
+              name: http-metrics
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            failureThreshold: 1
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      dnsPolicy: "ClusterFirst"
+      dnsConfig:
+        nameservers:
+          - 1.1.1.1

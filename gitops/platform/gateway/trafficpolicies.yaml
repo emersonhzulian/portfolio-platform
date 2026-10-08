@@ -1,0 +1,72 @@
+---
+# Visitors arrive through the Cloudflare tunnel, so Envoy only sees cloudflared's pod IP.
+# Cloudflare puts the visitor's address in CF-Connecting-IP; trusting it is safe here because
+# this gateway is ClusterIP-only and the tunnel is the only thing that reaches it. Without
+# this, every visitor would share one rate-limit bucket.
+#
+# Envoy Gateway allows exactly one ClientTrafficPolicy and one BackendTrafficPolicy per
+# Gateway (a second one is ignored as Conflicted), so these two hold every setting.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: portfolio
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: portfolio
+  clientIPDetection:
+    customHeader:
+      name: CF-Connecting-IP
+      failClosed: false
+---
+# Per-visitor rate limits: one bucket per client IP. They bound how fast anyone can send
+# queries through Grafana's Explore; what a single query may cost is capped by the backends
+# themselves (Prometheus/Loki/Tempo limits in ../../observability).
+#
+# Global, not local: the counters live in Redis (../redis), kept by Envoy Gateway's ratelimit
+# service, so the budget is shared by every Envoy replica of this gateway instead of each one
+# granting it again. If Redis is unreachable, Envoy fails open (requests pass unlimited).
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: portfolio
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: portfolio
+  rateLimit:
+    type: Global
+    global:
+      rules:
+        # Grafana queries (dashboards panels and Explore): every panel refresh is one call.
+        - clientSelectors:
+            - sourceCIDR:
+                type: Distinct
+                value: 0.0.0.0/0
+              path:
+                type: PathPrefix
+                value: /api/ds/query
+          limit:
+            requests: 60
+            unit: Minute
+        # Label / series / tag lookups used by Explore's query builders and autocomplete.
+        - clientSelectors:
+            - sourceCIDR:
+                type: Distinct
+                value: 0.0.0.0/0
+              path:
+                type: PathPrefix
+                value: /api/datasources
+          limit:
+            requests: 120
+            unit: Minute
+        # Everything else (pages, static assets, Argo CD UI): a generous ceiling against floods.
+        - clientSelectors:
+            - sourceCIDR:
+                type: Distinct
+                value: 0.0.0.0/0
+          limit:
+            requests: 600
+            unit: Minute

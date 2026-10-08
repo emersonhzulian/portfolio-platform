@@ -1,0 +1,24 @@
+---
+# Authentik's PostgreSQL, run by CloudNativePG. One instance on iSCSI (Delete class, like
+# the rest of the portfolio): accounts here are demo accounts, not something to keep.
+# cnpg generates the `authentik-db-app` Secret (user/password/uri) that the chart reads.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: authentik-db
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie
+  bootstrap:
+    initdb:
+      database: authentik
+      owner: authentik
+  storage:
+    size: 2Gi
+    storageClass: freenas-iscsi-csi
+  resources:
+    requests: {cpu: 25m, memory: 128Mi}
+    limits: {memory: 512Mi}
+  managed:
+    services:
+      disabledDefaultServices: ["ro", "r"]

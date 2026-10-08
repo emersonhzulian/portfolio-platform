@@ -1,0 +1,64 @@
+---
+# Placeholder app so the public dashboards have data from day one: the stock ASP.NET
+# sample with .NET auto-instrumentation (logs + traces to otel-portfolio). Swap for real
+# portfolio apps whenever they exist.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo
+  labels:
+    app: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo
+  template:
+    metadata:
+      labels:
+        app: demo
+      annotations:
+        instrumentation.opentelemetry.io/inject-dotnet: "true"
+        # The sample image is Alpine (musl). Don't use the bare `aspnetapp` tag: it tracks
+        # .NET previews, which the agent doesn't support.
+        instrumentation.opentelemetry.io/otel-dotnet-auto-runtime: linux-musl-x64
+    spec:
+      containers:
+        - name: demo
+          image: mcr.microsoft.com/dotnet/samples:aspnetapp-10.0
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            requests:
+              cpu: 25m
+              memory: 96Mi
+            limits:
+              memory: 256Mi
+          # Numeric UID is required, not just nice: the OpenTelemetry operator copies this
+          # securityContext onto the injected opentelemetry-auto-instrumentation-dotnet init
+          # container, whose image runs as root - with runAsNonRoot alone the kubelet refuses
+          # to start it (CreateContainerConfigError). 1654 is `app`, the user of Microsoft's
+          # .NET images.
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1654
+            runAsGroup: 1654
+            capabilities: {drop: ["ALL"]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo
+spec:
+  selector:
+    app: demo
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

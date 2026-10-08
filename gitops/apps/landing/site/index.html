@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emerson Zulian — Platform Portfolio</title>
+<meta name="description" content="A self-hosted Kubernetes platform you can use and look inside: GitOps, observability, zero open ports.">
+<style>
+  :root {
+    --bg: #f7f7f5; --surface: #ffffff; --text: #1c1c1a; --muted: #5d5d58;
+    --border: #e2e2dc; --accent: #2f6f4f; --accent-soft: #e6f0ea; --live: #2f8f5b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --surface: #1d1d1b; --text: #ecece8; --muted: #a3a39c;
+      --border: #2e2e2b; --accent: #7cc49d; --accent-soft: #1f2e26; --live: #6fd39a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 48px 16px 64px; }
+  h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); line-height: 1.15; margin: 0 0 12px; }
+  h2 { font-size: 1.25rem; margin: 56px 0 16px; }
+  h3 { font-size: 1rem; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  .lede { color: var(--muted); font-size: 1.1rem; max-width: 640px; }
+  a { color: var(--accent); }
+  code { font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; text-decoration: none; color: inherit; display: block;
+  }
+  a.card:hover { border-color: var(--accent); }
+  .card p { color: var(--muted); font-size: .93rem; margin: 0; }
+  .tag {
+    display: inline-block; font-size: .75rem; font-weight: 600; letter-spacing: .02em;
+    padding: 1px 8px; border-radius: 99px; margin-bottom: 8px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .tag.live::before { content: "● "; color: var(--live); }
+  .tag.next { background: transparent; border: 1px dashed var(--border); color: var(--muted); }
+
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 4px; }
+  .flow span {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 10px; font-size: .9rem;
+  }
+  .flow i { font-style: normal; color: var(--muted); }
+
+  ol.journey { padding-left: 20px; margin: 0; }
+  ol.journey li { margin-bottom: 8px; }
+  footer { margin-top: 64px; color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>A small platform, run like a real one.</h1>
+  <p class="lede">
+    This is a Kubernetes platform running in my homelab, reachable from the internet with zero open
+    ports. Everything here is live, deployed by GitOps and observable. You can open it, query it
+    and watch it work.
+  </p>
+
+  <h2>Try it</h2>
+  <div class="grid">
+    <a class="card" href="https://grafana.emersonzulian.dev">
+      <span class="tag live">live</span>
+      <h3>Grafana</h3>
+      <p>Dashboards plus Explore: run your own PromQL, LogQL and TraceQL. You can't log in or save anything, and every query has a cap.</p>
+    </a>
+    <a class="card" href="https://grafana.emersonzulian.dev/d/portfolio-platform">
+      <span class="tag live">live</span>
+      <h3>Platform dashboard</h3>
+      <p>The machinery underneath: Argo CD sync and health, the Git revision Flux applied, the TLS certificate and the edge gateway's traffic and rate limiting.</p>
+    </a>
+    <a class="card" href="https://argocd.emersonzulian.dev/applications/argocd/portfolio?view=tree">
+      <span class="tag live">live</span>
+      <h3>Argo CD</h3>
+      <p>The whole app-of-apps tree, read-only. Every resource on this page came from a commit.</p>
+    </a>
+    <a class="card" href="https://status.emersonzulian.dev">
+      <span class="tag live">live</span>
+      <h3>Status</h3>
+      <p>Gatus probes every public endpoint from outside the cluster, checks the internal backends, and shows whether Argo CD is in sync.</p>
+    </a>
+    <a class="card" href="https://github.com/emersonhzulian/portfolio-platform">
+      <span class="tag live">live</span>
+      <h3>Source code</h3>
+      <p>Every manifest Argo CD applies, the shop's code and its CI, in one public repository. Renovate keeps it current with pull requests.</p>
+    </a>
+    <a class="card" href="https://demo.emersonzulian.dev">
+      <span class="tag live">live</span>
+      <h3>Demo app</h3>
+      <p>A .NET app instrumented by the OpenTelemetry Operator with no code changes. Its traces and logs are already in Grafana.</p>
+    </a>
+  </div>
+
+  <h2>How a request gets here</h2>
+  <div class="flow" aria-label="Request path">
+    <span>You</span><i>→</i><span>Cloudflare</span><i>→</i><span>Cloudflare Tunnel</span><i>→</i>
+    <span>Envoy Gateway (TLS)</span><i>→</i><span>App</span><i>→</i><span>OpenTelemetry</span><i>→</i>
+    <span>Prometheus · Loki · Tempo</span><i>→</i><span>Grafana</span>
+  </div>
+  <p class="lede" style="font-size:.95rem">
+    The gateway has no external IP. The tunnel is the only way in. cert-manager issues the TLS
+    certificate and external-dns writes the DNS record for each route.
+  </p>
+
+  <h2>Under the hood</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Two-layer GitOps</h3>
+      <p><b>Flux</b> bootstraps the platform (CNI, operators, Argo CD itself). <b>Argo CD</b> runs this product from its own folder. AppProjects cap what a commit here can create. <b>Renovate</b> opens the update PRs.</p>
+    </div>
+    <div class="card">
+      <h3>Secrets</h3>
+      <p><b>OpenBao</b> runs outside the cluster. <b>External Secrets</b> syncs credentials in, so Git only ever holds references.</p>
+    </div>
+    <div class="card">
+      <h3>Data &amp; storage</h3>
+      <p>PostgreSQL via <b>CloudNativePG</b>. Volumes come from <b>TrueNAS</b> over iSCSI and NFS, provisioned by <b>democratic-csi</b>.</p>
+    </div>
+    <div class="card">
+      <h3>Edge</h3>
+      <p><b>Cloudflare</b> + <b>Cloudflare Tunnel</b> → <b>Envoy Gateway</b> (Gateway API). Real client IP from <code>CF-Connecting-IP</code> and rate limits per visitor. <b>cert-manager</b> and <b>ExternalDNS</b> automate TLS and DNS.</p>
+    </div>
+    <div class="card">
+      <h3>Network</h3>
+      <p><b>Cilium</b> replaces kube-proxy, announces load balancers over L2 and gives visibility with <b>Hubble</b>. This namespace is default-deny in and out with plain Kubernetes <b>NetworkPolicy</b>. Cilium policies cover only what the native API can't express, such as outbound calls pinned to hostnames. <b>Spegel</b> shares container images between nodes.</p>
+    </div>
+    <div class="card">
+      <h3>Observability</h3>
+      <p><b>OpenTelemetry Operator</b> auto-instrumentation sends traces and logs to <b>Tempo</b> and <b>Loki</b>. Span metrics go to <b>Prometheus</b>. This stack is separate from the rest of the homelab's.</p>
+    </div>
+    <div class="card">
+      <h3>Nodes</h3>
+      <p><b>Talos Linux</b>: immutable, API-driven and with no SSH. Messaging uses the <b>Strimzi</b> operator for Kafka.</p>
+    </div>
+  </div>
+
+  <h2>Building next</h2>
+  <p>A small shop built for this platform (.NET + Node), designed so that you can follow your own click through every layer:</p>
+  <ol class="journey">
+    <li>Create an account (<b>Authentik</b>) and buy something.</li>
+    <li>Payment is simulated, and the "paid" event goes through <b>Kafka</b>. A worker writes your receipt, and you download it from <b>FileBrowser</b>.</li>
+    <li>Open <b>Grafana</b> filtered to your user and see the request as one trace across four services.</li>
+    <li>New versions ship as <b>Argo Rollouts</b> canaries that roll back by themselves when error rate rises. <b>Kyverno</b> enforces the rules. Scheduled <b>chaos</b> kills pods every hour, and the status page shows that nobody noticed.</li>
+  </ol>
+  <div class="grid" style="margin-top:16px">
+    <div class="card"><span class="tag next">next</span><h3>Shop + Kafka + receipts</h3><p>Redis for sessions and rate limits, Postgres on CloudNativePG.</p></div>
+    <div class="card"><span class="tag next">next</span><h3>Progressive delivery &amp; policy</h3><p>Argo Rollouts, Kyverno and Chaos Mesh.</p></div>
+  </div>
+
+  <footer>
+    Emerson Zulian · this page is served by two nginx replicas behind the same gateway as everything above.
+  </footer>
+</main>
+</body>
+</html>

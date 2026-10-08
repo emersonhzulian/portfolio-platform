@@ -1,0 +1,246 @@
+# Portfolio visitors, as code. Applied by the authentik worker on start and whenever this
+# file changes; values that aren't in Git come from the environment (!Env, see
+# ../externalsecret.yaml).
+#
+#   - sign-up: username + password (no e-mail: no personal data is collected), behind a
+#     Cloudflare Turnstile check, creating a user in the `visitors` group;
+#   - the login page links to it, and its title shows the public demo account;
+#   - the `demo` account itself, read-only (it's shared: no password, profile or MFA changes).
+#
+# Visitors are *internal* users on purpose: authentik only lets internal users into the user
+# portal (/if/user/ - their apps, password, MFA); external users are sent to a default app or
+# refused. They hold no permissions, so the admin interface stays closed to them (and
+# /if/admin answers 404 on the public route anyway).
+version: 1
+metadata:
+  name: Portfolio - visitors
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+entries:
+  - model: authentik_core.group
+    id: visitors
+    identifiers:
+      name: visitors
+
+  # --- Sign-up -------------------------------------------------------------------------
+  - model: authentik_policies_password.passwordpolicy
+    id: password-length
+    identifiers:
+      name: portfolio-password-length
+    attrs:
+      password_field: password
+      length_min: 8
+      amount_digits: 0
+      amount_uppercase: 0
+      amount_lowercase: 0
+      amount_symbols: 0
+      check_static_rules: true
+      check_have_i_been_pwned: false
+      check_zxcvbn: false
+      error_message: Use at least 8 characters.
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-username
+    identifiers:
+      name: portfolio-enrollment-username
+    attrs:
+      field_key: username
+      label: Username
+      type: username
+      required: true
+      placeholder: Pick a username
+      order: 0
+  - model: authentik_stages_prompt.prompt
+    id: prompt-password
+    identifiers:
+      name: portfolio-enrollment-password
+    attrs:
+      field_key: password
+      label: Password
+      type: password
+      required: true
+      placeholder: Password
+      order: 1
+  - model: authentik_stages_prompt.prompt
+    id: prompt-password-repeat
+    identifiers:
+      name: portfolio-enrollment-password-repeat
+    attrs:
+      field_key: password_repeat
+      label: Password (again)
+      type: password
+      required: true
+      placeholder: Password (again)
+      order: 2
+
+  - model: authentik_stages_prompt.promptstage
+    id: enrollment-prompt
+    identifiers:
+      name: portfolio-enrollment-prompt
+    attrs:
+      fields:
+        - !KeyOf prompt-username
+        - !KeyOf prompt-password
+        - !KeyOf prompt-password-repeat
+      validation_policies:
+        - !KeyOf password-length
+
+  # Bots don't get accounts: Cloudflare Turnstile, verified server-side by authentik.
+  - model: authentik_stages_captcha.captchastage
+    id: turnstile
+    identifiers:
+      name: portfolio-turnstile
+    attrs:
+      public_key: !Env TURNSTILE_SITE_KEY
+      private_key: !Env TURNSTILE_SECRET_KEY
+      js_url: https://challenges.cloudflare.com/turnstile/v0/api.js
+      api_url: https://challenges.cloudflare.com/turnstile/v0/siteverify
+      interactive: true
+
+  - model: authentik_stages_user_write.userwritestage
+    id: enrollment-write
+    identifiers:
+      name: portfolio-enrollment-write
+    attrs:
+      user_creation_mode: always_create
+      create_users_as_inactive: false
+      create_users_group: !KeyOf visitors
+      user_type: internal
+      user_path_template: users/visitors
+
+  - model: authentik_stages_user_login.userloginstage
+    id: enrollment-login
+    identifiers:
+      name: portfolio-enrollment-login
+    attrs:
+      session_duration: hours=8
+
+  - model: authentik_flows.flow
+    id: enrollment-flow
+    identifiers:
+      slug: portfolio-enrollment
+    attrs:
+      name: Portfolio sign-up
+      title: Create a demo account
+      designation: enrollment
+      authentication: require_unauthenticated
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf enrollment-flow
+      stage: !KeyOf enrollment-prompt
+      order: 10
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf enrollment-flow
+      stage: !KeyOf turnstile
+      order: 20
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf enrollment-flow
+      stage: !KeyOf enrollment-write
+      order: 30
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf enrollment-flow
+      stage: !KeyOf enrollment-login
+      order: 40
+
+  # --- Login page ----------------------------------------------------------------------
+  # authentik's default login flow, with a "Sign up" link and the demo account in its title.
+  - model: authentik_stages_identification.identificationstage
+    identifiers:
+      name: default-authentication-identification
+    attrs:
+      # Restated because the stage is validated as a whole; username first (sign-up asks for
+      # no e-mail).
+      user_fields: [username, email]
+      enrollment_flow: !KeyOf enrollment-flow
+  - model: authentik_flows.flow
+    identifiers:
+      slug: default-authentication-flow
+    attrs:
+      title: !Format ["Welcome! No account? Sign up, or use demo / %s", !Env PORTFOLIO_DEMO_PASSWORD]
+
+  # --- The demo account is read-only ----------------------------------------------------
+  # It's shared by every visitor, so nobody may change it from the user portal: not its
+  # password, not its username (which would make it disappear for everyone), and no MFA
+  # (whoever enrolled a TOTP would lock everybody else out). The flows the portal uses for
+  # those changes are denied to `demo`; everyone else uses them normally.
+  - model: authentik_policies_expression.expressionpolicy
+    id: not-demo
+    identifiers:
+      name: portfolio-not-demo
+    attrs:
+      expression: |
+        if request.user.username == "demo":
+            ak_message("The demo account is shared by every visitor, so it can't be changed. Sign up for your own account to try this.")
+            return False
+        return True
+  - model: authentik_flows.flow
+    identifiers:
+      slug: default-password-change
+    attrs:
+      # Every binding must pass, so a binding added later can't override the one below.
+      policy_engine_mode: all
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      target: !Find [authentik_flows.flow, [slug, default-password-change]]
+      policy: !KeyOf not-demo
+  - model: authentik_flows.flow
+    identifiers:
+      slug: default-user-settings-flow
+    attrs:
+      # Every binding must pass, so a binding added later can't override the one below.
+      policy_engine_mode: all
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      target: !Find [authentik_flows.flow, [slug, default-user-settings-flow]]
+      policy: !KeyOf not-demo
+  - model: authentik_flows.flow
+    identifiers:
+      slug: default-authenticator-totp-setup
+    attrs:
+      # Every binding must pass, so a binding added later can't override the one below.
+      policy_engine_mode: all
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      target: !Find [authentik_flows.flow, [slug, default-authenticator-totp-setup]]
+      policy: !KeyOf not-demo
+  - model: authentik_flows.flow
+    identifiers:
+      slug: default-authenticator-webauthn-setup
+    attrs:
+      # Every binding must pass, so a binding added later can't override the one below.
+      policy_engine_mode: all
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      target: !Find [authentik_flows.flow, [slug, default-authenticator-webauthn-setup]]
+      policy: !KeyOf not-demo
+  - model: authentik_flows.flow
+    identifiers:
+      slug: default-authenticator-static-setup
+    attrs:
+      # Every binding must pass, so a binding added later can't override the one below.
+      policy_engine_mode: all
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      target: !Find [authentik_flows.flow, [slug, default-authenticator-static-setup]]
+      policy: !KeyOf not-demo
+
+  # --- The public demo account ---------------------------------------------------------
+  - model: authentik_core.user
+    identifiers:
+      username: demo
+    attrs:
+      name: Demo visitor
+      type: internal
+      path: users/visitors
+      password: !Env PORTFOLIO_DEMO_PASSWORD
+      groups:
+        - !KeyOf visitors

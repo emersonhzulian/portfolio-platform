@@ -1,0 +1,46 @@
+---
+# Container CPU/memory/network from every kubelet, keeping only series of pods in this
+# namespace. Mirrors the central kube-prometheus-stack-kubelet cadvisor endpoint.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: portfolio-cadvisor
+  labels:
+    # Excluded from the central Prometheus (base/observability/kube-prometheus-stack), which
+    # already scrapes these targets unfiltered.
+    prometheus.homelab/instance: portfolio
+spec:
+  namespaceSelector:
+    matchNames: [kube-system]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubelet
+  endpoints:
+    - port: https-metrics
+      path: /metrics/cadvisor
+      scheme: https
+      interval: 30s
+      honorLabels: true
+      authorization:
+        type: Bearer
+        credentials:
+          name: portfolio-prometheus-token
+          key: token
+      tlsConfig:
+        insecureSkipVerify: true
+      # metricRelabelings only filter scraped series; the synthetic per-target ones (up,
+      # scrape_duration_seconds, ...) keep the *target* labels - node IPs, kube-system, the
+      # central kubelet Service - and visitors can query them in Explore. instance becomes the
+      # node name (still unique per target), the rest is dropped. Scraped series keep their
+      # own namespace/pod/container labels (honorLabels).
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_endpoint_node_name]
+          targetLabel: instance
+        - targetLabel: job
+          replacement: cadvisor
+        - action: labeldrop
+          regex: (namespace|service|pod|container|endpoint|node)
+      metricRelabelings:
+        - sourceLabels: [namespace]
+          regex: portfolio
+          action: keep

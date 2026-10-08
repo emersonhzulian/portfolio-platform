@@ -1,0 +1,88 @@
+---
+# Helm values for the authentik chart (source and version: ../../argocd/platform/authentik.yaml).
+# Identity for the portfolio: visitors sign up (or use the demo account) at
+# auth.emersonzulian.dev and that login is what the shop and FileBrowser trust (OIDC).
+authentik:
+  log_level: info
+  error_reporting:
+    enabled: false
+  # CloudNativePG cluster in manifests/database.yaml; the password comes from the Secret
+  # cnpg generates (global.env below), the rest isn't secret.
+  postgresql:
+    host: authentik-db-rw
+    name: authentik
+    user: authentik
+    port: 5432
+
+global:
+  # AUTHENTIK_SECRET_KEY, AUTHENTIK_BOOTSTRAP_PASSWORD and the values the blueprints read
+  # (demo password, Turnstile keys) - from OpenBao via manifests/externalsecret.yaml.
+  envFrom:
+    - secretRef:
+        name: authentik-env
+    # SHOP_OIDC_CLIENT_SECRET (manifests/oidc-clients.yaml). Required: env is read at start,
+    # so authentik waits for it rather than registering the shop with an empty secret.
+    - secretRef:
+        name: shop-oidc
+  env:
+    - name: AUTHENTIK_POSTGRESQL__PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: authentik-db-app
+          key: password
+    # Nothing phones home: egress out of this namespace is default-deny anyway.
+    - name: AUTHENTIK_DISABLE_UPDATE_CHECK
+      value: "true"
+    - name: AUTHENTIK_DISABLE_STARTUP_ANALYTICS
+      value: "true"
+    - name: AUTHENTIK_AVATARS
+      value: initials
+
+# Portfolio-specific flows, the Turnstile captcha and the demo account, as code.
+blueprints:
+  configMaps:
+    - authentik-blueprints
+
+server:
+  # Two replicas, one per node: logging in survives a node reboot or the scheduled chaos.
+  replicas: 2
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      # Required, not preferred: with "anyway" both replicas once landed on one node.
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: authentik
+          app.kubernetes.io/component: server
+      # Count only pods of the same rollout: otherwise the outgoing ReplicaSet's pods steer
+      # the new ones onto one node during a rolling update, and they stay there.
+      matchLabelKeys: [pod-template-hash]
+  pdb:
+    enabled: true
+    minAvailable: 1
+  resources:
+    requests: {cpu: 50m, memory: 384Mi}
+    limits: {memory: 768Mi}
+  # No Kubernetes API access at all (see serviceAccount below).
+  serviceAccountName: default
+  automountServiceAccountToken: false
+  metrics:
+    enabled: true
+    # The chart's ServiceMonitor can't carry the label that keeps the central Prometheus
+    # away; manifests/monitoring.yaml has one that does.
+    serviceMonitor:
+      enabled: false
+
+worker:
+  replicas: 1
+  resources:
+    requests: {cpu: 50m, memory: 384Mi}
+    limits: {memory: 768Mi}
+  serviceAccountName: default
+  automountServiceAccountToken: false
+
+# No outposts managed from inside the cluster (the gateway does the OIDC for FileBrowser), so
+# no ServiceAccount, Role or ClusterRole: a public-facing IdP gets no Kubernetes permissions.
+serviceAccount:
+  create: false

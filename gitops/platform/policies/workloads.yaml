@@ -1,0 +1,157 @@
+---
+# Workload rules for this namespace, in CEL - the same language and shape as a Kubernetes
+# ValidatingAdmissionPolicy, with Kyverno adding what the native one lacks here: namespaced
+# policies (so they live in this folder and show up in Argo CD), background scans and
+# PolicyReports.
+#
+# Most run in Audit: violations land in PolicyReports (and on the platform dashboard)
+# without blocking anything, which is how a rule earns its way to Deny - fix what it reports,
+# then flip it. Mutable tags are already denied: nothing here uses one, and a deploy that
+# pins nothing can't be rolled back to a known state.
+#
+# Rules are written against Pods; autogen applies them to the pod templates of Deployments,
+# StatefulSets, DaemonSets, Jobs and CronJobs too, so a bad manifest is refused when Argo CD
+# applies it, not later when its pods fail to start.
+apiVersion: policies.kyverno.io/v1
+kind: NamespacedValidatingPolicy
+metadata:
+  name: disallow-mutable-tags
+spec:
+  validationActions: [Deny]
+  evaluation:
+    background:
+      enabled: true
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: images
+      expression: >-
+        object.spec.containers.map(c, c.image) +
+        (has(object.spec.initContainers) ? object.spec.initContainers.map(c, c.image) : [])
+  validations:
+    # A tag is a ':' after the last '/', so a registry port (host:5000/app) doesn't count.
+    - expression: >-
+        variables.images.all(i, i.contains('@') || i.split('/')[i.split('/').size() - 1].contains(':'))
+      message: Every image needs an explicit tag or digest.
+    - expression: "variables.images.all(i, !i.endsWith(':latest'))"
+      message: The mutable tag :latest isn't allowed; pin a version.
+---
+apiVersion: policies.kyverno.io/v1
+kind: NamespacedValidatingPolicy
+metadata:
+  name: allowed-registries
+spec:
+  validationActions: [Audit]
+  evaluation:
+    background:
+      enabled: true
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    # The registry is the first path segment when it looks like a host (has a '.' or ':');
+    # otherwise the image is on Docker Hub (busybox, grafana/loki).
+    - name: registries
+      expression: >-
+        (object.spec.containers +
+         (has(object.spec.initContainers) ? object.spec.initContainers : []))
+        .map(c, c.image.split('/'))
+        .map(p, p.size() > 1 && (p[0].contains('.') || p[0].contains(':')) ? p[0] : 'docker.io')
+  validations:
+    - expression: >-
+        variables.registries.all(r,
+          r in ['docker.io', 'ghcr.io', 'quay.io', 'registry.k8s.io', 'mcr.microsoft.com'])
+      message: Images must come from docker.io, ghcr.io, quay.io, registry.k8s.io or mcr.microsoft.com.
+---
+apiVersion: policies.kyverno.io/v1
+kind: NamespacedValidatingPolicy
+metadata:
+  name: require-resources
+spec:
+  validationActions: [Audit]
+  evaluation:
+    background:
+      enabled: true
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  validations:
+    - expression: >-
+        object.spec.containers.all(c,
+          has(c.resources) &&
+          has(c.resources.requests) && 'cpu' in c.resources.requests && 'memory' in c.resources.requests &&
+          has(c.resources.limits) && 'memory' in c.resources.limits)
+      message: Containers need CPU and memory requests and a memory limit.
+---
+apiVersion: policies.kyverno.io/v1
+kind: NamespacedValidatingPolicy
+metadata:
+  name: require-readiness-probe
+spec:
+  validationActions: [Audit]
+  evaluation:
+    background:
+      enabled: true
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  validations:
+    - expression: "object.spec.containers.all(c, has(c.readinessProbe))"
+      message: Containers need a readiness probe, so traffic only reaches pods that are ready.
+---
+apiVersion: policies.kyverno.io/v1
+kind: NamespacedValidatingPolicy
+metadata:
+  name: require-non-root
+spec:
+  validationActions: [Audit]
+  evaluation:
+    background:
+      enabled: true
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: podNonRoot
+      expression: >-
+        has(object.spec.securityContext) && has(object.spec.securityContext.runAsNonRoot) &&
+        object.spec.securityContext.runAsNonRoot
+  validations:
+    # Either the pod says non-root and no container overrides it, or every container says so.
+    - expression: >-
+        object.spec.containers.all(c,
+          has(c.securityContext) && has(c.securityContext.runAsNonRoot)
+            ? c.securityContext.runAsNonRoot
+            : variables.podNonRoot)
+      message: "Set runAsNonRoot: true on the pod or on every container."

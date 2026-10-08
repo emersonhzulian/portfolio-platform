@@ -1,0 +1,64 @@
+---
+# OTLP endpoint for instrumented apps in this namespace only: logs -> portfolio Loki,
+# traces -> portfolio Tempo. Stdout of every pod here is shipped separately by the
+# otel-logs-portfolio DaemonSet (logs-collector.yaml).
+# yaml-language-server: $schema=https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/main/config/crd/bases/opentelemetry.io_opentelemetrycollectors.yaml
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-portfolio
+spec:
+  mode: deployment
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 20
+      k8sattributes:
+        auth_type: serviceAccount
+        passthrough: false
+        filter:
+          namespace: portfolio
+        extract:
+          metadata:
+            - k8s.deployment.name
+            - k8s.node.name
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.ip
+          - sources:
+              - from: connection
+      batch: {}
+    exporters:
+      otlphttp/loki:
+        endpoint: http://loki.portfolio.svc.cluster.local:3100/otlp
+      otlp/tempo:
+        endpoint: tempo.portfolio.svc.cluster.local:4317
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [otlphttp/loki]
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [otlp/tempo]

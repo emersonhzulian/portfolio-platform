@@ -1,0 +1,140 @@
+---
+# Stdout of the portfolio namespace's pods -> the portfolio Loki. A standard node-level log
+# shipper (filelog on /var/log/pods), except that it only ever opens
+# /var/log/pods/portfolio_*, so nothing from other namespaces can reach the public Loki even
+# through a misconfigured filter.
+#
+# The one resource here outside the `portfolio` namespace: reading node log files needs
+# hostPath + root, i.e. a `privileged` PodSecurity namespace, and the internet-facing
+# `portfolio` namespace should not be one.
+#
+# Pods with .NET/Node auto-instrumentation are skipped: they already send their logs over
+# OTLP to otel-portfolio (collector.yaml), with trace ids.
+# yaml-language-server: $schema=https://raw.githubusercontent.com/open-telemetry/opentelemetry-operator/main/config/crd/bases/opentelemetry.io_opentelemetrycollectors.yaml
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-logs-portfolio
+  namespace: opentelemetry
+spec:
+  mode: daemonset
+  tolerations:
+    - operator: Exists
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+  volumes:
+    - name: varlogpods
+      hostPath:
+        path: /var/log/pods
+    # Its own offsets directory: sharing the central collector's would mix the two
+    # instances' checkpoints.
+    - name: file-storage
+      hostPath:
+        path: /var/lib/otelcol/file_storage_portfolio
+        type: DirectoryOrCreate
+  volumeMounts:
+    - name: varlogpods
+      mountPath: /var/log/pods
+      readOnly: true
+    - name: file-storage
+      mountPath: /var/lib/otelcol/file_storage
+  resources:
+    requests:
+      cpu: 10m
+      memory: 48Mi
+    limits:
+      memory: 192Mi
+  config:
+    extensions:
+      file_storage:
+        directory: /var/lib/otelcol/file_storage
+    receivers:
+      filelog:
+        # /var/log/pods/<namespace>_<pod>_<uid>/<container>/<restart>.log
+        include:
+          - /var/log/pods/portfolio_*/*/*.log
+        start_at: end
+        include_file_path: true
+        include_file_name: false
+        storage: file_storage
+        operators:
+          - type: container
+            id: container-parser
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 20
+      # Namespaced to portfolio; the Role/RoleBinding for this ServiceAccount live in
+      # rbac.yaml (they have to be created in the portfolio namespace).
+      k8sattributes:
+        auth_type: serviceAccount
+        passthrough: false
+        filter:
+          namespace: portfolio
+        extract:
+          metadata:
+            - k8s.deployment.name
+            - k8s.node.name
+          annotations:
+            - tag_name: otel_inject_dotnet
+              key: instrumentation.opentelemetry.io/inject-dotnet
+              from: pod
+            - tag_name: otel_inject_nodejs
+              key: instrumentation.opentelemetry.io/inject-nodejs
+              from: pod
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.uid
+      filter/skip-instrumented:
+        error_mode: ignore
+        logs:
+          log_record:
+            - 'resource.attributes["otel_inject_dotnet"] != nil'
+            - 'resource.attributes["otel_inject_nodejs"] != nil'
+      # Loki derives detected_level from `level=`, JSON fields and full words like "info".
+      # These abbreviated formats aren't recognised and ended up as "unknown", so set the
+      # OTLP severity (which Loki uses as detected_level) for them here:
+      #   Serilog / Jellyfin: "[INF]", "[WRN]", ...   klog: "I0930 01:41:09 ..."
+      #   .NET console: "info: ", "warn: ", "fail: ", ...
+      transform/severity:
+        error_mode: ignore
+        log_statements:
+          - context: log
+            conditions:
+              - 'IsString(body) and severity_number == SEVERITY_NUMBER_UNSPECIFIED'
+            statements:
+            - 'set(severity_text, "trace") where severity_text == "" and (IsMatch(body, "\\[(VRB|TRC)\\]") or IsMatch(body, "^trce: "))'
+            - 'set(severity_number, SEVERITY_NUMBER_TRACE) where severity_text == "trace"'
+            - 'set(severity_text, "debug") where severity_text == "" and (IsMatch(body, "\\[(DBG)\\]") or IsMatch(body, "^dbug: "))'
+            - 'set(severity_number, SEVERITY_NUMBER_DEBUG) where severity_text == "debug"'
+            - 'set(severity_text, "info") where severity_text == "" and (IsMatch(body, "\\[(INF)\\]") or IsMatch(body, "^I\\d{4} \\d{2}:") or IsMatch(body, "^info: "))'
+            - 'set(severity_number, SEVERITY_NUMBER_INFO) where severity_text == "info"'
+            - 'set(severity_text, "warn") where severity_text == "" and (IsMatch(body, "\\[(WRN)\\]") or IsMatch(body, "^W\\d{4} \\d{2}:") or IsMatch(body, "^warn: "))'
+            - 'set(severity_number, SEVERITY_NUMBER_WARN) where severity_text == "warn"'
+            - 'set(severity_text, "error") where severity_text == "" and (IsMatch(body, "\\[(ERR)\\]") or IsMatch(body, "^E\\d{4} \\d{2}:") or IsMatch(body, "^fail: "))'
+            - 'set(severity_number, SEVERITY_NUMBER_ERROR) where severity_text == "error"'
+            - 'set(severity_text, "fatal") where severity_text == "" and (IsMatch(body, "\\[(FTL)\\]") or IsMatch(body, "^F\\d{4} \\d{2}:") or IsMatch(body, "^crit: "))'
+            - 'set(severity_number, SEVERITY_NUMBER_FATAL) where severity_text == "fatal"'
+      resource/cleanup:
+        attributes:
+          - key: otel_inject_dotnet
+            action: delete
+          - key: otel_inject_nodejs
+            action: delete
+      batch: {}
+    exporters:
+      otlphttp/loki:
+        endpoint: http://loki.portfolio.svc.cluster.local:3100/otlp
+        sending_queue:
+          queue_size: 100
+    service:
+      extensions:
+        - file_storage
+      pipelines:
+        logs:
+          receivers: [filelog]
+          processors: [memory_limiter, k8sattributes, filter/skip-instrumented, transform/severity, resource/cleanup, batch]
+          exporters: [otlphttp/loki]

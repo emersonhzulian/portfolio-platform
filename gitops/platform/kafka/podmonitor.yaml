@@ -1,0 +1,20 @@
+---
+# Broker metrics (Strimzi metrics reporter) and kafka-exporter (consumer lag), both on the
+# pods' `tcp-prometheus` port.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kafka
+  labels:
+    prometheus.homelab/instance: portfolio # skipped by the central Prometheus
+spec:
+  selector:
+    matchLabels:
+      strimzi.io/cluster: portfolio
+    matchExpressions:
+      - key: strimzi.io/kind
+        operator: In
+        values: [Kafka]
+  podMetricsEndpoints:
+    - port: tcp-prometheus
+      interval: 30s

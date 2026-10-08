@@ -1,0 +1,26 @@
+---
+# Emitted by the orders service when a payment is confirmed; consumed by the receipts worker.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: order.paid
+  labels:
+    strimzi.io/cluster: portfolio
+spec:
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: 604800000 # 7 days
+---
+# Where the receipts worker parks an event it failed to process after its retries.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: order.paid.dlq
+  labels:
+    strimzi.io/cluster: portfolio
+spec:
+  partitions: 1
+  replicas: 1
+  config:
+    retention.ms: 604800000

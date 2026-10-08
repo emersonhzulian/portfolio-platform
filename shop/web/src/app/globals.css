@@ -1,0 +1,38 @@
+:root {
+  --bg: #f7f7f5; --surface: #ffffff; --text: #1c1c1a; --muted: #5d5d58;
+  --border: #e2e2dc; --accent: #2f6f4f; --accent-soft: #e6f0ea; --danger: #a33a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141413; --surface: #1d1d1b; --text: #ecece8; --muted: #a3a39c;
+    --border: #2e2e2b; --accent: #7cc49d; --accent-soft: #1f2e26; --danger: #e07a68;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent); }
+header, main, footer { max-width: 960px; margin: 0 auto; padding: 16px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+header nav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+h1 { font-size: 1.6rem; margin: 8px 0 4px; }
+.muted { color: var(--muted); }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.card p { margin: 4px 0 12px; color: var(--muted); font-size: .93rem; }
+.price { font-weight: 600; }
+button, .button { background: var(--accent); color: var(--bg); border: 0; border-radius: 6px;
+  padding: 7px 14px; font: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
+button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+form.inline { display: inline; }
+select { font: inherit; padding: 4px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.notice { background: var(--accent-soft); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+.error { color: var(--danger); }
+ol.timeline { list-style: none; padding: 0; margin: 0; border-left: 2px solid var(--border); }
+ol.timeline li { position: relative; padding: 0 0 14px 18px; }
+ol.timeline li::before { content: ""; position: absolute; left: -7px; top: 6px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--accent); }
+ol.timeline li.waiting::before { background: var(--border); }
+table { width: 100%; border-collapse: collapse; }
+td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); }
+footer { color: var(--muted); font-size: .85rem; }

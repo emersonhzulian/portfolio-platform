@@ -1,0 +1,521 @@
+---
+# The platform under the portfolio: Argo CD sync/health, the Flux hand-off and its Git
+# revision, the TLS certificate and the edge gateway - from the central Prometheus through a
+# federation allowlist (../prometheus/servicemonitor-platform.yaml). Anonymous visitors see
+# it at /d/portfolio-platform.
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/grafana.integreatly.org/grafanadashboard_v1beta1.json
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: portfolio-platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  resyncPeriod: 1m
+  instanceSelector:
+    matchLabels:
+      grafana.internal/instance: portfolio
+  json: |
+    {
+      "title": "Portfolio platform",
+      "uid": "portfolio-platform",
+      "schemaVersion": 39,
+      "editable": false,
+      "refresh": "1m",
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "tags": [
+        "portfolio"
+      ],
+      "panels": [
+        {
+          "id": 100,
+          "type": "text",
+          "title": "",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 3
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "**The platform under the portfolio**, read from the cluster's own monitoring: Argo CD sync and health of every app, the Flux Kustomization that installs them (and the Git revision it applied), the TLS certificate, and the edge gateway. Only these series are shared with this Grafana (a federation allowlist), so it shows the machinery without exposing the rest of the homelab."
+          }
+        },
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Argo CD apps in sync",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 3,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.9
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "count(argocd_app_info{sync_status=\"Synced\"}) / count(argocd_app_info)",
+              "instant": true
+            }
+          ],
+          "description": "Share of portfolio Argo CD Applications whose live state matches Git.",
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none"
+          }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Argo CD apps healthy",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 6,
+            "y": 3,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 0.9
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "count(argocd_app_info{health_status=\"Healthy\"}) / count(argocd_app_info)",
+              "instant": true
+            }
+          ],
+          "description": "Share of portfolio Argo CD Applications reporting Healthy.",
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none"
+          }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "TLS certificate expires in",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 3,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "dtdurations",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 1209600
+                  },
+                  {
+                    "color": "green",
+                    "value": 2592000
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "min(certmanager_certificate_expiration_timestamp_seconds) - time()",
+              "instant": true
+            }
+          ],
+          "description": "cert-manager renews it automatically ~30 days before expiry.",
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none"
+          }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Flux \u2192 Argo CD hand-off",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 18,
+            "y": 3,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "Not ready",
+                      "color": "red"
+                    },
+                    "1": {
+                      "text": "Ready",
+                      "color": "green"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "max(flux_resource_info{name=\"portfolio\",ready=\"True\"}) or vector(0)",
+              "instant": true
+            }
+          ],
+          "description": "Flux installs Argo CD and applies the portfolio's AppProjects + root Application; Argo CD takes it from there.",
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none"
+          }
+        },
+        {
+          "id": 5,
+          "type": "table",
+          "title": "Argo CD applications",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 7,
+            "w": 14,
+            "h": 10
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "max by (name, project, sync_status, health_status) (argocd_app_info)",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "description": "Every Application in the app-of-apps, live from Argo CD's controller.",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value": true
+                },
+                "indexByName": {
+                  "name": 0,
+                  "project": 1,
+                  "sync_status": 2,
+                  "health_status": 3
+                },
+                "renameByName": {
+                  "name": "Application",
+                  "project": "Project",
+                  "sync_status": "Sync",
+                  "health_status": "Health"
+                }
+              }
+            }
+          ],
+          "options": {
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "Application"
+              }
+            ]
+          }
+        },
+        {
+          "id": 6,
+          "type": "table",
+          "title": "Git revision applied by Flux",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 14,
+            "y": 7,
+            "w": 10,
+            "h": 10
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "max by (name, revision, ready, reason) (flux_resource_info)",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "description": "The commit Flux last applied for the cluster-side half of the portfolio (projects, root app, routes).",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value": true
+                },
+                "indexByName": {
+                  "name": 0,
+                  "revision": 1,
+                  "ready": 2,
+                  "reason": 3
+                },
+                "renameByName": {
+                  "name": "Kustomization",
+                  "revision": "Revision",
+                  "ready": "Ready",
+                  "reason": "Reason"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Edge requests by status class",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 17,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (envoy_response_code_class) (rate(envoy_http_downstream_rq_xx[5m]))",
+              "legendFormat": "{{envoy_response_code_class}}xx"
+            }
+          ],
+          "description": "Everything visitors send through the portfolio gateway (Envoy), after the Cloudflare tunnel."
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Rate limiting at the edge",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 17,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(rate(envoy_cluster_ratelimit_ok[5m]))",
+              "legendFormat": "allowed"
+            },
+            {
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(rate(envoy_cluster_ratelimit_over_limit[5m]))",
+              "legendFormat": "rate-limited (429)"
+            }
+          ],
+          "description": "Per-visitor limits (client IP from CF-Connecting-IP), counted in Redis so every Envoy replica shares one budget. Rate-limited requests never reach the apps."
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "Argo CD apps by health over time",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 25,
+            "w": 24,
+            "h": 7
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "count by (health_status) (argocd_app_info)",
+              "legendFormat": "{{health_status}}"
+            }
+          ],
+          "description": "Dips show syncs in progress or apps degrading - and recovering on their own."
+        }
+      ]
+    }

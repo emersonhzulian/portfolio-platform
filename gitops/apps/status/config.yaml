@@ -1,0 +1,109 @@
+# Gatus config for status.emersonzulian.dev. No secrets and no alerting here: this instance is
+# a public status page (the homelab's own Gatus, with Discord alerts, is separate).
+#
+# Three groups, each answering a different question:
+#   Public    - can a visitor reach it? Probed through the public URL, so the check leaves the
+#               cluster and comes back in through Cloudflare and the tunnel, like a visitor.
+#   GitOps    - is what runs what Git says? Read from Argo CD's anonymous read-only API.
+#   Internals - are the backends behind the public pages up? Probed in-cluster.
+metrics: true
+
+storage:
+  type: sqlite
+  path: /data/data.db
+
+ui:
+  title: Status · emersonzulian.dev
+  header: Portfolio status
+  description: Live checks of every public endpoint, the GitOps sync state and the backends behind them.
+  link: https://emersonzulian.dev
+  buttons:
+    - name: Home
+      link: https://emersonzulian.dev
+    - name: Grafana
+      link: https://grafana.emersonzulian.dev
+    - name: Argo CD
+      link: https://argocd.emersonzulian.dev/applications/argocd/portfolio?view=tree
+
+endpoints:
+  # ---- Public ---------------------------------------------------------------------------
+  - name: Landing page
+    group: Public
+    url: https://emersonzulian.dev/healthz
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(ok*)"
+      - "[CERTIFICATE_EXPIRATION] > 168h"
+
+  - name: Grafana
+    group: Public
+    url: https://grafana.emersonzulian.dev/api/health
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      # Proves Grafana itself answered, not just something on that hostname.
+      - "[BODY].database == ok"
+
+  - name: Argo CD
+    group: Public
+    url: https://argocd.emersonzulian.dev/healthz
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Demo app
+    group: Public
+    url: https://demo.emersonzulian.dev/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 2000"
+
+  # ---- GitOps ---------------------------------------------------------------------------
+  # The root of the app-of-apps: Synced + Healthy means every child app is too (each wave
+  # waits on its children's health).
+  - name: portfolio (root application)
+    group: GitOps
+    url: https://argocd.emersonzulian.dev/api/v1/applications/portfolio
+    interval: 2m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status.sync.status == Synced"
+      - "[BODY].status.health.status == Healthy"
+
+  # ---- Internals ------------------------------------------------------------------------
+  - name: Prometheus
+    group: Internals
+    url: http://prometheus-operated:9090/-/ready
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Loki
+    group: Internals
+    url: http://loki:3100/ready
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Tempo
+    group: Internals
+    url: http://tempo:3200/ready
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: OpenTelemetry collector
+    group: Internals
+    url: http://otel-portfolio-collector-monitoring:8888/metrics
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Cloudflare tunnel
+    group: Internals
+    url: http://cloudflare-tunnel-portfolio:2000/ready
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"

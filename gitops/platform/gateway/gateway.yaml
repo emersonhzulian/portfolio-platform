@@ -1,0 +1,42 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/gateway.networking.k8s.io/gateway_v1.json
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: portfolio
+spec:
+  gatewayClassName: envoy-gateway
+  infrastructure:
+    parametersRef:
+      group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      name: portfolio-proxy-config
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.emersonzulian.dev"
+      # Only routes from this namespace can attach: nothing else in the cluster can be
+      # published on the public domain by accident.
+      allowedRoutes:
+        namespaces:
+          from: Same
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: emersonzulian-tls-secret
+    # The bare domain (landing page). A wildcard hostname doesn't match the apex, so it needs
+    # its own listener; same port and certificate (which already lists emersonzulian.dev).
+    - name: https-apex
+      protocol: HTTPS
+      port: 443
+      hostname: "emersonzulian.dev"
+      allowedRoutes:
+        namespaces:
+          from: Same
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: emersonzulian-tls-secret

@@ -1,0 +1,23 @@
+---
+# Let's Encrypt (DNS-01 through Cloudflare) for emersonzulian.dev. A namespaced Issuer, not a
+# ClusterIssuer: only this namespace uses it, and it reads its token from here rather than
+# from the cert-manager namespace.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: emersonzulian-letsencrypt-cloudflare
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: emersonhzulian@gmail.com
+    privateKeySecretRef:
+      name: emersonzulian-letsencrypt-private-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: emersonzulian-cloudflare-token-secret
+              key: cloudflare-token
+        selector:
+          dnsZones:
+            - "emersonzulian.dev"

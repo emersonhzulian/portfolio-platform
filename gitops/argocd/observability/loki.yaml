@@ -1,0 +1,42 @@
+---
+# Logs: Loki (single binary, 7 days).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability-loki
+  namespace: argocd
+  labels:
+    portfolio.emersonzulian.dev/level: component
+    portfolio.emersonzulian.dev/group: observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/background
+spec:
+  project: portfolio
+  sources:
+    - repoURL: ghcr.io/grafana-community/helm-charts
+      chart: loki
+      targetRevision: 18.14.0
+      helm:
+        releaseName: loki
+        valueFiles:
+          - $values/gitops/observability/loki/values.yaml
+    - repoURL: https://github.com/emersonhzulian/portfolio-platform
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: portfolio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

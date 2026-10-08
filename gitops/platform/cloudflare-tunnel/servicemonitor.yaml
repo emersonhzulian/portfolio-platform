@@ -1,0 +1,17 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cloudflare-tunnel-portfolio
+  labels:
+    # The central Prometheus skips ServiceMonitors with this label (no double scrape).
+    prometheus.homelab/instance: portfolio
+spec:
+  endpoints:
+    - honorLabels: false
+      interval: 60s
+      scrapeTimeout: 30s
+      targetPort: http-metrics
+  selector:
+    matchLabels:
+      app: cloudflare-tunnel

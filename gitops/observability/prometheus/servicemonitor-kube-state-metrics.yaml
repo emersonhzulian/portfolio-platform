@@ -1,0 +1,33 @@
+---
+# Pod/deployment state from the shared kube-state-metrics, keeping only this namespace.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: portfolio-kube-state-metrics
+  labels:
+    # Excluded from the central Prometheus (base/observability/kube-prometheus-stack), which
+    # already scrapes these targets unfiltered.
+    prometheus.homelab/instance: portfolio
+spec:
+  namespaceSelector:
+    matchNames: [observability]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  endpoints:
+    - port: http
+      interval: 30s
+      honorLabels: true
+      # Same reason as in servicemonitor-cadvisor.yaml: keep the pod IP and the
+      # observability namespace out of the synthetic per-target series.
+      relabelings:
+        - targetLabel: instance
+          replacement: kube-state-metrics
+        - targetLabel: job
+          replacement: kube-state-metrics
+        - action: labeldrop
+          regex: (namespace|service|pod|container|endpoint)
+      metricRelabelings:
+        - sourceLabels: [namespace]
+          regex: portfolio
+          action: keep

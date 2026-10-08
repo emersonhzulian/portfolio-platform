@@ -1,0 +1,35 @@
+---
+# Every pod in this namespace lands on the nodes labelled portfolio.emersonzulian.dev/pool,
+# including pods that operators and charts create (Prometheus, Loki, Tempo, the collector,
+# databases later) - which is why this is a mutation at admission and not a field in each
+# manifest. It sets a nodeSelector key, which ANDs with whatever affinity a chart already has.
+#
+# CEL, same shape as a Kubernetes MutatingAdmissionPolicy. JSONPatch rather than an
+# ApplyConfiguration: nodeSelector is an atomic map, which apply-style patches can't merge
+# into. With a nodeSelector already there, only the pool key is added.
+#
+# Pods only: `controllers: []` turns autogen off (it's on by default and would also rewrite
+# the pod templates of Deployments/StatefulSets, which Argo CD would then see drift from Git).
+# failurePolicy Fail: with Kyverno down, a portfolio pod waits rather than land off-pool.
+apiVersion: policies.kyverno.io/v1
+kind: NamespacedMutatingPolicy
+metadata:
+  name: node-pool
+spec:
+  failurePolicy: Fail
+  autogen:
+    podControllers:
+      controllers: []
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE]
+        resources: [pods]
+  mutations:
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: >-
+          has(object.spec.nodeSelector)
+            ? [JSONPatch{op: "add", path: "/spec/nodeSelector/portfolio.emersonzulian.dev~1pool", value: "true"}]
+            : [JSONPatch{op: "add", path: "/spec/nodeSelector", value: {"portfolio.emersonzulian.dev/pool": "true"}}]

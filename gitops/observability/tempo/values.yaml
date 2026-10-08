@@ -1,0 +1,58 @@
+---
+# Portfolio copy of the cluster's Tempo setup; only ever holds traces from the portfolio
+# namespace.
+# Helm values for the tempo chart (source and version: ../apps/tempo.yaml).
+tempo:
+  # Same window as Loki, so a trace's logs are always still there.
+  retention: 168h
+  reportingEnabled: false
+  # Lets Grafana stream search results instead of waiting for the full response.
+  streamOverHttpEnabled: true
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  # service-graphs/span-metrics are remote-written to Prometheus (RED metrics and the
+  # service map). TraceQL metrics, used by Grafana's Traces Drilldown, need no processor
+  # in Tempo 3.x (the old local-blocks processor is gone).
+  # Visitors can run any TraceQL through Grafana's Explore: cap what one search may cost.
+  queryFrontend:
+    search:
+      max_duration: 168h
+      max_result_limit: 100
+  overrides:
+    defaults:
+      read:
+        max_bytes_per_tag_values_query: 1000000
+      global:
+        max_bytes_per_trace: 5000000
+      metrics_generator:
+        processors:
+          - service-graphs
+          - span-metrics
+  metricsGenerator:
+    enabled: true
+    # The portfolio Prometheus (../prometheus), not the central one.
+    remoteWriteUrl: http://prometheus-operated.portfolio.svc.cluster.local:9090/api/v1/write
+    # On the PVC instead of the chart's /tmp (emptyDir) default.
+    storage:
+      path: /var/tempo/generator/wal
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+persistence:
+  enabled: true
+  size: 10Gi
+  # iSCSI, Delete class - see ../prometheus/prometheus.yaml.
+  storageClassName: freenas-iscsi-csi
+serviceMonitor:
+  enabled: true
+  # The central Prometheus skips ServiceMonitors with this label (no double scrape).
+  additionalLabels:
+    prometheus.homelab/instance: portfolio

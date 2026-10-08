@@ -1,0 +1,19 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ./externalsecret.yaml
+  - ./oidc-clients.yaml
+  - ./database.yaml
+  - ./monitoring.yaml
+  - ./httproute.yaml
+configMapGenerator:
+  # The chart mounts it by this exact name (values.yaml, blueprints.configMaps); authentik
+  # re-applies a blueprint when the mounted file changes, so no hash suffix is needed.
+  - name: authentik-blueprints
+    files:
+      - ./blueprints/visitors.yaml
+      - ./blueprints/shop.yaml
+    options:
+      disableNameSuffixHash: true

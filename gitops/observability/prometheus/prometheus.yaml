@@ -1,0 +1,53 @@
+---
+# Second Prometheus, run by the prometheus-operator that kube-prometheus-stack already
+# installs. It only reads ServiceMonitors/PodMonitors from this namespace; the operator
+# creates the `prometheus-operated` Service here.
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/monitoring.coreos.com/prometheus_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: portfolio
+spec:
+  replicas: 1
+  serviceAccountName: portfolio-prometheus
+  retention: 7d
+  # Whichever comes first: 7d or this size - below the 10Gi volume, so the oldest blocks go
+  # before the disk is full (a full disk stops Prometheus).
+  retentionSize: 9GB
+  # Visitors can run any PromQL through Grafana's Explore: cap what one query may cost.
+  query:
+    timeout: 30s
+    maxConcurrency: 4
+    # Default is 50M samples in memory per query.
+    maxSamples: 5000000
+  # Tempo's metrics-generator (../tempo) remote-writes span/service-graph metrics here.
+  enableRemoteWriteReceiver: true
+  serviceMonitorSelector: {}
+  serviceMonitorNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: portfolio
+  podMonitorSelector: {}
+  podMonitorNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: portfolio
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 768Mi
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 2000
+    fsGroup: 2000
+  # iSCSI (a real block device for the TSDB), Delete class: telemetry survives pod restarts,
+  # not a cluster rebuild, and leaves no orphan volume behind. Thin - 10Gi is a ceiling.
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: freenas-iscsi-csi
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 10Gi

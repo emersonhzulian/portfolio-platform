@@ -1,0 +1,117 @@
+---
+# Public, read-only Grafana: anonymous visitors are Viewers who can open the dashboards and
+# run their own queries in Explore (viewers_can_edit) - but can't save anything. What keeps
+# that safe:
+#   - the datasources only hold this namespace's data (separate Prometheus/Loki/Tempo);
+#   - each backend caps what one query may cost (timeouts, series/sample/line limits);
+#   - the gateway rate-limits queries per visitor and 404s logins and raw backend APIs
+#     (httproute.yaml, ../../platform/gateway/trafficpolicies.yaml);
+#   - a CiliumNetworkPolicy confines this pod to its datasources.
+# The admin login is only reachable through routes the hosting cluster adds on its private
+# network.
+#
+# The label is what the datasources/dashboards here select on
+# (grafana.internal/instance: portfolio); the central Grafana's CRs use another value and
+# live in another namespace, so nothing crosses over.
+#
+# Sync order inside this component (Argo CD waves): the admin Secret (-1), then this Grafana
+# (0) - which Argo CD reports Progressing until the operator has it running - and only then
+# the datasources and dashboards (1). Created together, they hit the operator before any
+# instance is ready ("NoMatchingInstance") and wait out its error backoff for minutes.
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/grafana.integreatly.org/grafana_v1beta1.json
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: grafana
+  labels:
+    grafana.internal/instance: portfolio
+spec:
+  config:
+    analytics:
+      check_for_updates: "false"
+      check_for_plugin_updates: "false"
+      feedback_links_enabled: "false"
+      reporting_enabled: "false"
+    auth:
+      disable_login_form: "false"
+    auth.anonymous:
+      enabled: "true"
+      org_name: Main Org.
+      org_role: Viewer
+      hide_version: "true"
+    users:
+      allow_sign_up: "false"
+      # Explore for Viewers; they still can't save dashboards.
+      viewers_can_edit: "true"
+    explore:
+      enabled: "true"
+    # Nothing stored per anonymous visitor.
+    query_history:
+      enabled: "false"
+    # Upper bound for any datasource request made through Grafana.
+    dataproxy:
+      timeout: "30"
+    public_dashboards:
+      enabled: "true"
+    snapshots:
+      enabled: "false"
+    # Don't serve Grafana's own /metrics.
+    metrics:
+      enabled: "false"
+    log:
+      mode: console
+    news:
+      news_feed_enabled: "false"
+    plugins:
+      plugin_admin_enabled: "false"
+    security:
+      admin_user: admin
+      angular_support_enabled: "true"
+      cookie_secure: "true"
+      disable_gravatar: "true"
+    # No root_url: the same instance answers on the public and the private hostname, and a
+    # fixed root_url would send private-network logins to the public one.
+    server:
+      enable_gzip: "true"
+  # /var/lib/grafana on an iSCSI volume instead of the operator's emptyDir: Grafana's
+  # SQLite works on a block device (it had locking problems on NFS, which is why this used
+  # to be an emptyDir). The operator creates `grafana-pvc` from this; the `grafana-data`
+  # volume below - the operator's own name for that mount - points at it. Delete class:
+  # disposable on a cluster rebuild, everything in it comes from CRs anyway.
+  persistentVolumeClaim:
+    spec:
+      storageClassName: freenas-iscsi-csi
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 1Gi
+  deployment:
+    spec:
+      strategy:
+        type: Recreate
+      template:
+        spec:
+          volumes:
+            - name: grafana-data
+              persistentVolumeClaim:
+                claimName: grafana-pvc
+          containers:
+            - name: grafana
+              # Admin login works only where /login is routed (the private route, not the public one).
+              env:
+                - name: GF_SECURITY_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: grafana-portfolio-admin
+                      key: password
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: {drop: ["ALL"]}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            fsGroupChangePolicy: OnRootMismatch
+  disableDefaultSecurityContext: All

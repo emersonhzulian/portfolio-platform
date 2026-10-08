@@ -1,0 +1,57 @@
+---
+# The platform underneath this namespace, as seen by the cluster's central Prometheus:
+# Argo CD sync/health of every portfolio app, the Flux Kustomization that installs them, the
+# TLS certificate, and the portfolio gateway's Envoy (requests by status class, rate-limit
+# hits). Pulled through /federate with an allowlist - only the series named in `match[]`
+# cross over, each one already scoped to the portfolio - so the public Grafana can show the
+# machinery without seeing the rest of the homelab. Dashboard: ../grafana/dashboard-platform.yaml.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: portfolio-platform
+  labels:
+    prometheus.homelab/instance: portfolio # skipped by the central Prometheus itself
+spec:
+  namespaceSelector:
+    matchNames: [observability]
+  selector:
+    matchLabels:
+      app: kube-prometheus-stack-prometheus
+  endpoints:
+    - port: http-web
+      path: /federate
+      interval: 60s
+      scrapeTimeout: 20s
+      # Federated series carry the labels the central Prometheus gave them; keep those.
+      honorLabels: true
+      params:
+        match[]:
+          - 'argocd_app_info{project=~"portfolio|portfolio-root"}'
+          - 'flux_resource_info{kind="Kustomization",name=~"portfolio|portfolio-routes"}'
+          - 'certmanager_certificate_expiration_timestamp_seconds{exported_namespace="portfolio"}'
+          - 'certmanager_certificate_ready_status{exported_namespace="portfolio"}'
+          - 'envoy_http_downstream_rq_xx{gateway="portfolio",gateway_namespace="portfolio"}'
+          # Global (Redis-backed) rate limit decisions, per upstream cluster.
+          - 'envoy_cluster_ratelimit_ok{gateway="portfolio",gateway_namespace="portfolio"}'
+          - 'envoy_cluster_ratelimit_over_limit{gateway="portfolio",gateway_namespace="portfolio"}'
+          - 'kyverno_policy_results_total{resource_namespace="portfolio"}'
+      # The synthetic up/scrape_* series: no pod IP, no observability namespace.
+      relabelings:
+        - targetLabel: instance
+          replacement: platform
+        - targetLabel: job
+          replacement: platform
+        - action: labeldrop
+          regex: (namespace|service|pod|container|endpoint)
+      metricRelabelings:
+        # Envoy's admin listener isn't visitor traffic.
+        - sourceLabels: [envoy_http_conn_manager_prefix]
+          regex: admin
+          action: drop
+        # Pod IPs and scrape plumbing from the central side.
+        - targetLabel: instance
+          replacement: platform
+        - targetLabel: job
+          replacement: platform
+        - action: labeldrop
+          regex: (container|endpoint|service|uid|path|dest_server|repo|prometheus|prometheus_replica)

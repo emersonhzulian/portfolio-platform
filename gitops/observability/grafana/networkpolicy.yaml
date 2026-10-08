@@ -1,0 +1,62 @@
+---
+# The Grafana pod is the one internet-facing process in this namespace that runs
+# visitor-written queries. If it were ever compromised it can only reach its three
+# datasources and DNS - not the rest of the cluster (central Prometheus/Loki, databases, the
+# Kubernetes API) and not even its own neighbours here.
+#
+# The namespace is default-deny (../../platform/network-policies), and Grafana is left out of
+# its `same-namespace` allow, so this policy is everything Grafana gets beyond DNS
+# (`allow-dns` there). Kubelet probes come from the host and stay allowed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        # Envoy Gateway proxies: the portfolio gateway (public) and whatever private gateway
+        # the hosting cluster routes to Grafana. Which paths reach Grafana is decided by each
+        # HTTPRoute, not here.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+        # grafana-operator pushes datasources/dashboards through Grafana's API.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana-operator
+      ports:
+        - port: 3000
+          protocol: TCP
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 9090
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: loki
+      ports:
+        - port: 3100
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: tempo
+      ports:
+        - port: 3200
+          protocol: TCP

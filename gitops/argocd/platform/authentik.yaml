@@ -1,0 +1,46 @@
+---
+# Identity: authentik (sign-up with Turnstile, demo account, OIDC for the shop and
+# FileBrowser), its CloudNativePG database, secrets and public route.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-authentik
+  namespace: argocd
+  labels:
+    portfolio.emersonzulian.dev/level: component
+    portfolio.emersonzulian.dev/group: platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/background
+spec:
+  project: portfolio
+  sources:
+    - repoURL: ghcr.io/goauthentik/helm-charts
+      chart: authentik
+      targetRevision: 2026.8.3
+      helm:
+        releaseName: authentik
+        valueFiles:
+          - $values/gitops/platform/authentik/values.yaml
+    - repoURL: https://github.com/emersonhzulian/portfolio-platform
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/emersonhzulian/portfolio-platform
+      targetRevision: main
+      path: gitops/platform/authentik/manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: portfolio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

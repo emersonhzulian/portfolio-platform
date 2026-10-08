@@ -1,0 +1,13 @@
+---
+# Used by httproute.yaml to answer logins and raw backend API paths without reaching Grafana.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: HTTPRouteFilter
+metadata:
+  name: not-found
+spec:
+  directResponse:
+    statusCode: 404
+    contentType: text/plain
+    body:
+      type: Inline
+      inline: "Not Found"

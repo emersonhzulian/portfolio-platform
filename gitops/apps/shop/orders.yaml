@@ -1,0 +1,109 @@
+---
+# orders: catalog, orders, the payment webhook and the order.paid event (shop/orders).
+# Called by the web app (with the visitor's access token) and by payments (the webhook).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-orders
+  labels:
+    app: shop-orders
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shop-orders
+  template:
+    metadata:
+      labels:
+        app: shop-orders
+        app.kubernetes.io/name: shop-orders
+        app.kubernetes.io/part-of: portfolio-shop
+      annotations:
+        instrumentation.opentelemetry.io/inject-dotnet: "true"
+    spec:
+      automountServiceAccountToken: false
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: shop-orders
+          matchLabelKeys: [pod-template-hash]
+      containers:
+        - name: orders
+          image: ghcr.io/emersonhzulian/portfolio-platform/orders:0.1.1
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef: {name: shop-db-app, key: username}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: shop-db-app, key: password}
+            - name: ConnectionStrings__Orders
+              value: "Host=shop-db-rw;Database=orders;Username=$(DB_USER);Password=$(DB_PASSWORD);GSS Encryption Mode=Disable"
+            - name: Payments__BaseUrl
+              value: http://shop-payments
+            - name: Orders__CallbackUrl
+              value: http://shop-orders.portfolio.svc.cluster.local/payments/callback
+            - name: Orders__WebhookSecret
+              valueFrom:
+                secretKeyRef: {name: shop-webhook, key: secret}
+            - name: Kafka__BootstrapServers
+              value: portfolio-kafka-bootstrap:9092
+            # Tokens are issued for the public URL; the keys that verify them are read in-cluster.
+            - name: Auth__Issuer
+              value: https://auth.emersonzulian.dev/application/o/portfolio-shop/
+            - name: Auth__MetadataAddress
+              value: http://authentik-server/application/o/portfolio-shop/.well-known/openid-configuration
+            - name: Auth__Audience
+              value: portfolio-shop
+            # The outbox publisher's spans (resuming the payment's trace) come from this source.
+            - name: OTEL_DOTNET_AUTO_TRACES_ADDITIONAL_SOURCES
+              value: Orders
+            - name: OTEL_DOTNET_AUTO_LOG_DIRECTORY
+              value: /tmp
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+          livenessProbe:
+            httpGet: {path: /livez, port: http}
+          resources:
+            requests: {cpu: 25m, memory: 128Mi}
+            limits: {memory: 384Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            # Numeric, so the injected auto-instrumentation init container can run too.
+            runAsUser: 1654
+            runAsGroup: 1654
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop-orders
+spec:
+  selector:
+    app: shop-orders
+  ports:
+    - {name: http, port: 80, targetPort: http}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: shop-orders
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: shop-orders

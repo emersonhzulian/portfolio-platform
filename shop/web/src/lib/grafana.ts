@@ -1,0 +1,16 @@
+import { config } from "./config";
+
+// Deep links into the public Grafana's Explore, pre-filled with a TraceQL query.
+export function traceSearchUrl(traceql: string, from = "now-1h"): string {
+  const panes = {
+    a: {
+      datasource: "tempo",
+      queries: [{ refId: "A", datasource: { type: "tempo", uid: "tempo" }, queryType: "traceql", query: traceql, limit: 20 }],
+      range: { from, to: "now" },
+    },
+  };
+  return `${config.grafanaUrl}/explore?schemaVersion=1&orgId=1&panes=${encodeURIComponent(JSON.stringify(panes))}`;
+}
+
+export const orderTraceUrl = (orderId: string) => traceSearchUrl(`{ span.order.id = "${orderId}" }`, "now-6h");
+export const userTraceUrl = (username: string) => traceSearchUrl(`{ span.enduser.id = "${username.replaceAll('"', "")}" }`, "now-24h");

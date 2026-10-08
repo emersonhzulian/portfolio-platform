@@ -1,0 +1,95 @@
+---
+# Kafka for the portfolio's events (order.paid -> receipts), run by the cluster's Strimzi
+# operator. One KRaft node that is both controller and broker: this is a demo's event bus,
+# not a durability claim - replication factor 1 everywhere, and the README says so.
+#
+# Only reachable inside the namespace (plain listener, no TLS): the namespace's network
+# policies are the boundary. Strimzi adds its own NetworkPolicies on top so its operator
+# (namespace strimzi) can reach the broker's control ports.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: kafka
+  labels:
+    strimzi.io/cluster: portfolio
+spec:
+  replicas: 1
+  roles: [controller, broker]
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: 5Gi
+        # Block storage for the log segments; Delete class like the other portfolio volumes.
+        class: freenas-iscsi-csi
+        deleteClaim: true
+        kraftMetadata: shared
+  resources:
+    requests: {cpu: 100m, memory: 768Mi}
+    limits: {memory: 1Gi}
+  jvmOptions:
+    -Xms: 256m
+    -Xmx: 512m
+  template:
+    pod:
+      # Replaces Strimzi's default pod securityContext, so it has to carry its fsGroup too:
+      # the image runs as uid 1001 / gid 0, and the data volume must be group-writable.
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 0
+---
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: portfolio
+spec:
+  kafka:
+    version: 4.3.1
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      # Single node: every internal topic has one replica.
+      offsets.topic.replication.factor: 1
+      transaction.state.log.replication.factor: 1
+      transaction.state.log.min.isr: 1
+      default.replication.factor: 1
+      min.insync.replicas: 1
+      # Topics are declared as KafkaTopic objects (topics.yaml), never created by a typo.
+      auto.create.topics.enable: false
+      log.retention.hours: 168
+    # Kafka's own metrics in Prometheus format, no JMX exporter config to maintain.
+    metricsConfig:
+      type: strimziMetricsReporter
+      values:
+        allowList:
+          - "kafka_server_brokertopicmetrics.*"
+          - "kafka_server_replicamanager.*"
+          - "kafka_network_requestmetrics_requests_total.*"
+          - "kafka_log_log_size.*"
+          - "kafka_controller.*"
+  entityOperator:
+    # The topic operator turns KafkaTopic objects into topics. No users: there's no
+    # authentication on an in-namespace listener.
+    topicOperator:
+      resources:
+        requests: {cpu: 25m, memory: 128Mi}
+        limits: {memory: 384Mi}
+    template:
+      pod:
+        securityContext:
+          runAsNonRoot: true
+  # Consumer-group lag and per-topic offsets - what the receipts worker's dashboard reads.
+  kafkaExporter:
+    topicRegex: ".*"
+    groupRegex: ".*"
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {memory: 128Mi}
+    template:
+      pod:
+        securityContext:
+          runAsNonRoot: true

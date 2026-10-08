@@ -1,0 +1,64 @@
+---
+# HTTPRoutes on the portfolio Gateway (../gateway) become proxied CNAMEs to the portfolio
+# Cloudflare tunnel. The Gateway itself is ClusterIP-only, so the tunnel is the only way in;
+# --default-targets points every record at it instead of an IP.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: external-dns
+  template:
+    metadata:
+      labels:
+        app: external-dns
+    spec:
+      serviceAccountName: external-dns
+      containers:
+        - name: external-dns
+          image: registry.k8s.io/external-dns/external-dns:v0.23.0
+          args:
+            - --source=gateway-httproute
+            - --gateway-namespace=portfolio
+            - --gateway-name=portfolio
+            - --annotation-filter=external-dns.alpha.kubernetes.io/cloudflare=true
+            # $(TUNNEL_ID) is expanded by the kubelet from the env var below.
+            - --default-targets=$(TUNNEL_ID).cfargotunnel.com
+            - --force-default-targets
+            - --cloudflare-proxied
+            - --txt-owner-id=external-dns-portfolio-tunnel
+            - --domain-filter=emersonzulian.dev
+            - --provider=cloudflare
+            - --cloudflare-record-comment=provisioned by external-dns
+            - --policy=sync
+            - --interval=1m
+          env:
+            - name: TUNNEL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: external-dns-cloudflare
+                  key: tunnel-id
+            - name: CF_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: external-dns-cloudflare
+                  key: api-token
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534

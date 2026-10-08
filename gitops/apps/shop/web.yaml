@@ -1,0 +1,118 @@
+---
+# web: the storefront and backend-for-frontend (shop/web), at shop.emersonzulian.dev.
+# Logs visitors in with authentik (OIDC), keeps sessions and per-user rate limits in Redis and
+# calls orders with the visitor's access token.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-web
+  labels:
+    app: shop-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shop-web
+  template:
+    metadata:
+      labels:
+        app: shop-web
+        app.kubernetes.io/name: shop-web
+        app.kubernetes.io/part-of: portfolio-shop
+      annotations:
+        instrumentation.opentelemetry.io/inject-nodejs: "true"
+    spec:
+      automountServiceAccountToken: false
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: shop-web
+          matchLabelKeys: [pod-template-hash]
+      containers:
+        - name: web
+          image: ghcr.io/emersonhzulian/portfolio-platform/web:0.1.1
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: APP_URL
+              value: https://shop.emersonzulian.dev
+            - name: OIDC_ISSUER
+              value: https://auth.emersonzulian.dev/application/o/portfolio-shop/
+            - name: OIDC_CLIENT_ID
+              value: portfolio-shop
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: {name: shop-oidc, key: SHOP_OIDC_CLIENT_SECRET}
+            - name: ORDERS_URL
+              value: http://shop-orders
+            # Database 1: database 0 holds the gateway's global rate-limit counters.
+            - name: REDIS_URL
+              value: redis://redis:6379/1
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+          livenessProbe:
+            tcpSocket: {port: http}
+          resources:
+            requests: {cpu: 25m, memory: 128Mi}
+            limits: {memory: 384Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: next-cache, mountPath: /app/.next/cache}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: next-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop-web
+spec:
+  selector:
+    app: shop-web
+  ports:
+    - {name: http, port: 80, targetPort: http}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: shop-web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: shop-web
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: shop
+  annotations:
+    external-dns.alpha.kubernetes.io/cloudflare: "true"
+spec:
+  parentRefs:
+    - name: portfolio
+      sectionName: https
+  hostnames:
+    - "shop.emersonzulian.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: shop-web
+          port: 80
