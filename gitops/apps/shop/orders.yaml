@@ -32,7 +32,7 @@ spec:
           matchLabelKeys: [pod-template-hash]
       containers:
         - name: orders
-          image: ghcr.io/emersonhzulian/portfolio-platform/orders:0.1.1
+          image: ghcr.io/emersonhzulian/portfolio-platform/orders:0.1.2
           ports:
             - name: http
               containerPort: 8080
