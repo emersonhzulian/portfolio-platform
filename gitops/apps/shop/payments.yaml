@@ -52,6 +52,11 @@ spec:
               value: Payments
             - name: OTEL_DOTNET_AUTO_LOG_DIRECTORY
               value: /tmp
+            # Database spans come from the EF Core instrumentation. The agent turns EF Core's off for
+            # Npgsql when its Npgsql instrumentation is on, and that one emits nothing with
+            # Npgsql 10 - so with both defaults, queries never showed up in traces.
+            - name: OTEL_DOTNET_AUTO_TRACES_NPGSQL_INSTRUMENTATION_ENABLED
+              value: "false"
           readinessProbe:
             httpGet: {path: /healthz, port: http}
           livenessProbe:

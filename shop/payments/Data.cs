@@ -37,20 +37,41 @@ public class PaymentsDb(DbContextOptions<PaymentsDb> options) : DbContext(option
 public static class Schema
 {
     // Every replica starts this; the advisory lock makes the first one create the tables
-    // and the others wait instead of racing it.
-    public static async Task EnsureAsync(IServiceProvider services)
+    // and the others wait instead of racing it. On a fresh deploy the database (or the
+    // cluster) may not exist yet: wait for it with backoff instead of crashing the pod.
+    public static async Task EnsureAsync(IServiceProvider services, CancellationToken ct = default)
+    {
+        var log = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(Schema));
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await CreateAsync(services, ct);
+                return;
+            }
+            catch (Exception e) when (attempt < 30 && e is Npgsql.NpgsqlException or InvalidOperationException)
+            {
+                var delay = TimeSpan.FromSeconds(Math.Min(2 * attempt, 10));
+                log.LogWarning("Database not ready ({Reason}); retrying in {Delay}s (attempt {Attempt})",
+                    e.GetBaseException().Message, delay.TotalSeconds, attempt);
+                await Task.Delay(delay, ct);
+            }
+        }
+    }
+
+    static async Task CreateAsync(IServiceProvider services, CancellationToken ct)
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<PaymentsDb>();
-        await db.Database.OpenConnectionAsync();
+        await db.Database.OpenConnectionAsync(ct);
         try
         {
-            await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_lock(4242)");
-            await db.Database.EnsureCreatedAsync();
+            await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_lock(4242)", ct);
+            await db.Database.EnsureCreatedAsync(ct);
         }
         finally
         {
-            await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_unlock(4242)");
+            await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_unlock(4242)", ct);
             await db.Database.CloseConnectionAsync();
         }
     }
