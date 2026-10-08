@@ -60,6 +60,21 @@ endpoints:
       - "[STATUS] == 200"
       - "[RESPONSE_TIME] < 2000"
 
+  - name: Shop
+    group: Public
+    url: https://shop.emersonzulian.dev/healthz
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == ok"
+
+  - name: Sign-up / login (authentik)
+    group: Public
+    url: https://auth.emersonzulian.dev/-/health/ready/
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+
   # ---- GitOps ---------------------------------------------------------------------------
   # The root of the app-of-apps: Synced + Healthy means every child app is too (each wave
   # waits on its children's health).
