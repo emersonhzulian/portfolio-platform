@@ -3,8 +3,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ./demo.yaml
-  - ./landing.yaml
-  - ./status.yaml
-  - ./shop.yaml
   - ./kafka-ui.yaml
+# Hashed name: a config change rolls the pod by itself.
+configMapGenerator:
+  - name: kafka-ui-config
+    files:
+      - ./config.yaml

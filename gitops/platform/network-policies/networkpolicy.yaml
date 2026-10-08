@@ -9,10 +9,10 @@
 # The model:
 #   - Inside the namespace, pods talk freely (apps -> collector -> Loki/Tempo -> Prometheus).
 #     The namespace is the trust boundary.
-#   - Grafana is the exception: it runs visitor-written queries, so it keeps its own, narrower
-#     policy (../../observability/grafana/networkpolicy.yaml) and is left out of
-#     `same-namespace`. Policies only ever add allows, so selecting it there would widen
-#     what it can reach.
+#   - Grafana and the Kafka UI are the exceptions: both are public tools visitors drive, so
+#     each keeps its own, narrower policy (Grafana: ../../observability/grafana/networkpolicy.yaml,
+#     Kafka UI: `kafka-ui` below) and is left out of `same-namespace`. Policies only ever add
+#     allows, so selecting them there would widen what they can reach.
 #
 # Kubelet probes come from the host and stay allowed (Cilium's default for host traffic).
 # Debug a dropped flow: `kubectl -n kube-system port-forward svc/hubble-relay 4245:80`, then
@@ -55,7 +55,7 @@ spec:
     matchExpressions:
       - key: app
         operator: NotIn
-        values: [grafana]
+        values: [grafana, kafka-ui]
   policyTypes: [Ingress, Egress]
   ingress:
     # Anything from inside the namespace (Grafana included, as a client of the datasources).
@@ -294,4 +294,40 @@ spec:
               app.kubernetes.io/component: proxy
       ports:
         - port: 3000
+          protocol: TCP
+---
+# The public Kafka UI: reached by the gateways (and scraped by Prometheus); talks to nothing but
+# the broker's authenticated listener (9093, KafkaUser kafka-ui, read-only ACLs) - not the
+# anonymous in-namespace one (9092), not Redis, not the databases.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-ui
+spec:
+  podSelector:
+    matchLabels:
+      app: kafka-ui
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/name: portfolio-kafka
+      ports:
+        - port: 9093
           protocol: TCP

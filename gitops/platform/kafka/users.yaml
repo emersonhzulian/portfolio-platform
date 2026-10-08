@@ -1,0 +1,25 @@
+---
+# The public Kafka UI's identity: read-only, enforced by the broker (ACLs), not just by the UI.
+# Strimzi generates the password into the Secret `kafka-ui` (keys `password` and
+# `sasl.jaas.config`).
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: kafka-ui
+  labels:
+    strimzi.io/cluster: portfolio
+spec:
+  authentication:
+    type: scram-sha-512
+  authorization:
+    type: simple
+    acls:
+      # Topics: list them, read their configuration and their messages.
+      - resource: {type: topic, name: "*", patternType: literal}
+        operations: [Describe, DescribeConfigs, Read]
+      # Consumer groups: list them and their offsets (lag), never join or reset them.
+      - resource: {type: group, name: "*", patternType: literal}
+        operations: [Describe]
+      # The cluster: brokers and their configuration.
+      - resource: {type: cluster}
+        operations: [Describe, DescribeConfigs]

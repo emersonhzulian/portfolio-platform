@@ -1,0 +1,38 @@
+# Kafbat UI (kafka-ui) for the public, read-only view of the portfolio's Kafka.
+# Mounted as /config/config.yaml; the SCRAM login comes from the environment
+# (KAFKA_SASL_JAAS_CONFIG, from the Secret `kafka-ui` Strimzi makes for the KafkaUser).
+auth:
+  type: DISABLED # anonymous: everyone sees the same read-only view
+dynamic:
+  config:
+    enabled: false # no in-browser wizard: the cluster list can't be changed from the UI
+kafka:
+  clusters:
+    - name: portfolio
+      bootstrapServers: portfolio-kafka-bootstrap:9093
+      # The UI's own lock: no create/delete/edit/produce. The broker's ACLs are the second
+      # one (KafkaUser kafka-ui is read-only).
+      readOnly: true
+      properties:
+        security.protocol: SASL_SSL
+        sasl.mechanism: SCRAM-SHA-512
+        ssl.truststore.type: PEM
+        ssl.truststore.location: /etc/kafka-ca/ca.crt
+        # Resolved from the environment, so this whole list stays in one place: Spring
+        # replaces a list set in two sources instead of merging it.
+        sasl.jaas.config: ${KAFKA_SASL_JAAS_CONFIG}
+      # The order events carry the authentik subject id; show the username (so a visitor can
+      # find their own purchase) but not the id.
+      masking:
+        - type: REPLACE
+          fields: [userId]
+          replacement: "***"
+          topicValuesPattern: "order\\.paid.*"
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+logging:
+  level:
+    root: INFO
