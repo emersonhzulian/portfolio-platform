@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
@@ -5,8 +7,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Orders;
 
 // Consumes receipt.ready (from the receipts service) and adds the last step to the order's
-// timeline. The .NET agent instruments Confluent.Kafka's consumer, continuing the trace that
-// started at checkout. Idempotent: a redelivered event finds the step already recorded.
+// timeline. Idempotent: a redelivered event finds the step already recorded.
+//
+// The .NET agent's Kafka instrumentation makes each `receive` span the root of a new trace,
+// only *linked* to the producer (OpenTelemetry's messaging convention). To keep the purchase a
+// single trace, the processing span below takes the traceparent from the message headers as
+// its parent - the same thing the receipts service does on its side.
 public class ReceiptEvents(IServiceScopeFactory scopes, IConfiguration config, ILogger<ReceiptEvents> log)
     : BackgroundService
 {
@@ -30,7 +36,15 @@ public class ReceiptEvents(IServiceScopeFactory scopes, IConfiguration config, I
             {
                 var result = consumer.Consume(ct);
                 if (result?.Message is null) continue;
-                Record(result.Message.Value).GetAwaiter().GetResult();
+                var traceParent = result.Message.Headers?.TryGetLastBytes("traceparent", out var raw) == true
+                    ? Encoding.UTF8.GetString(raw) : null;
+                using (var activity = OutboxPublisher.Source.StartActivity("receipt.ready process", ActivityKind.Consumer, traceParent))
+                {
+                    activity?.SetTag("messaging.system", "kafka");
+                    activity?.SetTag("messaging.destination.name", result.Topic);
+                    activity?.SetTag("order.id", result.Message.Key);
+                    Record(result.Message.Value).GetAwaiter().GetResult();
+                }
                 consumer.Commit(result);
             }
             catch (OperationCanceledException) { break; }
