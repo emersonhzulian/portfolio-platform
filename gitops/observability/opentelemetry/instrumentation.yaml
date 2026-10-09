@@ -2,7 +2,9 @@
 # Auto-instrumentation for apps in this namespace. It must be the *only* Instrumentation
 # here: pods opt in with a bare "true", which the operator resolves to the single
 # Instrumentation in the pod's namespace (with two it refuses to pick and injects nothing).
-# One resource covers every language:
+# One resource covers every language. Apps don't write these annotations themselves: they label
+# the pod portfolio.emersonzulian.dev/instrument: dotnet|nodejs and a Kyverno policy adds the
+# annotation (../../platform/policies/instrumentation.yaml):
 #   instrumentation.opentelemetry.io/inject-dotnet: "true"
 #     (Alpine images also need instrumentation.opentelemetry.io/otel-dotnet-auto-runtime: "linux-musl-x64")
 #   instrumentation.opentelemetry.io/inject-nodejs: "true"

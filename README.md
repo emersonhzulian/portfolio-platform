@@ -260,8 +260,9 @@ limits and the pods' memory limits keep any damage inside this namespace's own s
    `dns-proxy`) or the API server.
 2. Add an `HTTPRoute` on `Gateway/portfolio` with the annotation
    `external-dns.alpha.kubernetes.io/cloudflare: "true"`.
-3. Annotate the pod template with `instrumentation.opentelemetry.io/inject-dotnet: "true"`
-   (or `inject-nodejs`). If the container sets `runAsNonRoot`, also set a numeric
+3. Label the pod template `portfolio.emersonzulian.dev/instrument: dotnet` (or `nodejs`): a
+   Kyverno policy turns it into the OpenTelemetry operator's inject annotation on each pod
+   (`gitops/platform/policies/instrumentation.yaml`). If the container sets `runAsNonRoot`, also set a numeric
    `runAsUser`: the injected init container inherits the app's securityContext, and its
    image runs as root.
 4. Add an Application for it in `gitops/argocd/apps/`.

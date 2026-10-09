@@ -1,0 +1,47 @@
+---
+# Auto-instrumentation by label: a pod labelled
+#   portfolio.emersonzulian.dev/instrument: dotnet | nodejs
+# gets the OpenTelemetry operator's inject annotation for that language, and the operator then
+# adds the agent (init container, env, volume) using the namespace's `default` Instrumentation.
+# A manifest says what language it is; how it gets traced is decided here, once.
+#
+# Order matters: the API server calls mutating webhooks sorted by configuration name, so
+# Kyverno's (kyverno-resource-mutating-webhook-cfg) runs before the operator's
+# (opentelemetry-operator-mutation) and the annotation is there when the operator looks.
+#
+# Pods only (`controllers: []`), like node-pool: the annotation lands on each new pod, not on
+# the Deployment/Rollout templates, so Argo CD sees no drift. failurePolicy Ignore: with
+# Kyverno down a pod still starts, just without traces.
+apiVersion: policies.kyverno.io/v1
+kind: NamespacedMutatingPolicy
+metadata:
+  name: auto-instrumentation
+spec:
+  failurePolicy: Ignore
+  autogen:
+    podControllers:
+      controllers: []
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE]
+        resources: [pods]
+  matchConditions:
+    - name: has-supported-language
+      expression: >-
+        has(object.metadata.labels) &&
+        "portfolio.emersonzulian.dev/instrument" in object.metadata.labels &&
+        object.metadata.labels["portfolio.emersonzulian.dev/instrument"] in ["dotnet", "nodejs"]
+  variables:
+    - name: key
+      # '/' in a JSON Pointer is written '~1'.
+      expression: >-
+        "instrumentation.opentelemetry.io~1inject-" + object.metadata.labels["portfolio.emersonzulian.dev/instrument"]
+  mutations:
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: >-
+          has(object.metadata.annotations)
+            ? [JSONPatch{op: "add", path: "/metadata/annotations/" + variables.key, value: "true"}]
+            : [JSONPatch{op: "add", path: "/metadata/annotations", value: {variables.key.replace("~1", "/"): "true"}}]
