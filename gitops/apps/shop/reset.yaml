@@ -1,0 +1,119 @@
+---
+# Nightly reset of the demo data, so a public demo doesn't grow forever:
+#   - orders older than 7 days (the shared `demo` account's: older than 1 day) - their items
+#     and timeline go with them (ON DELETE CASCADE); outbox rows published over a day ago;
+#   - payments older than 7 days;
+#   - receipts older than 7 days (demo's: 1 day), then empty folders;
+#   - visitor accounts in authentik created over 7 days ago - never `demo`.
+# Each step is its own init container, in that order, so a failure stops the rest and shows up
+# as a failed Job. The authentik step is a Django shell (`ak shell`) of authentik's own image,
+# on authentik's database: no API token, no extra permissions to grant.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: shop-reset
+spec:
+  schedule: "0 4 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 604800
+      template:
+        metadata:
+          labels:
+            app: shop-reset
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            fsGroup: 1000
+            seccompProfile: {type: RuntimeDefault}
+          initContainers:
+            - name: orders
+              image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie
+              command: [psql, --set=ON_ERROR_STOP=1, -c]
+              args:
+                - >-
+                  DELETE FROM orders WHERE "CreatedAt" < now() - interval '7 days'
+                  OR ("UserName" = 'demo' AND "CreatedAt" < now() - interval '1 day');
+                  DELETE FROM outbox WHERE "PublishedAt" < now() - interval '1 day';
+              env:
+                - {name: PGHOST, value: shop-db-rw}
+                - {name: PGDATABASE, value: orders}
+                - name: PGUSER
+                  valueFrom: {secretKeyRef: {name: shop-db-app, key: username}}
+                - name: PGPASSWORD
+                  valueFrom: {secretKeyRef: {name: shop-db-app, key: password}}
+              resources: &small
+                requests: {cpu: 10m, memory: 32Mi}
+                limits: {memory: 128Mi}
+              securityContext: &restricted
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 1000
+                runAsGroup: 1000
+                capabilities: {drop: ["ALL"]}
+            - name: payments
+              image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie
+              command: [psql, --set=ON_ERROR_STOP=1, -c]
+              args:
+                - DELETE FROM payments WHERE "CreatedAt" < now() - interval '7 days';
+              env:
+                - {name: PGHOST, value: shop-db-rw}
+                - {name: PGDATABASE, value: payments}
+                - {name: PGUSER, value: payments}
+                - name: PGPASSWORD
+                  valueFrom: {secretKeyRef: {name: shop-db-payments, key: password}}
+              resources: *small
+              securityContext: *restricted
+            - name: receipts
+              image: busybox:1.38
+              command: [sh, -c]
+              args:
+                - |
+                  set -e
+                  [ -d /receipts/users ] || exit 0
+                  find /receipts/users -type f -name '*.pdf' -mtime +7 -print -delete
+                  [ -d /receipts/users/demo ] && find /receipts/users/demo -type f -name '*.pdf' -mtime +0 -print -delete
+                  find /receipts/users -mindepth 1 -type d -empty -print -delete
+              resources: *small
+              securityContext: *restricted
+              volumeMounts:
+                - {name: receipts, mountPath: /receipts}
+          containers:
+            - name: visitors
+              # Same version as the authentik chart (../../platform/authentik).
+              image: ghcr.io/goauthentik/server:2026.8.3
+              command: [ak, shell, -c]
+              args:
+                - |
+                  from datetime import timedelta
+                  from django.utils.timezone import now
+                  from authentik.core.models import User
+                  old = User.objects.filter(path="users/visitors", date_joined__lt=now() - timedelta(days=7)).exclude(username="demo")
+                  print(f"deleting {old.count()} visitor account(s)")
+                  old.delete()
+              envFrom:
+                - secretRef: {name: authentik}
+                - secretRef: {name: authentik-env}
+              env:
+                - name: AUTHENTIK_POSTGRESQL__PASSWORD
+                  valueFrom: {secretKeyRef: {name: authentik-db-app, key: password}}
+              resources:
+                requests: {cpu: 50m, memory: 256Mi}
+                limits: {memory: 512Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                runAsUser: 1000
+                runAsGroup: 1000
+                capabilities: {drop: ["ALL"]}
+          volumes:
+            - name: receipts
+              persistentVolumeClaim:
+                claimName: shop-receipts

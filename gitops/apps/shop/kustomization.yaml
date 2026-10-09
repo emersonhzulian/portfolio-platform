@@ -9,3 +9,4 @@ resources:
   - ./orders.yaml
   - ./web.yaml
   - ./receipts.yaml
+  - ./reset.yaml
