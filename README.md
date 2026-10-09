@@ -15,7 +15,6 @@ this repository is live.
 | **Kafka** (read-only) — topics, consumer groups and the shop's events | https://kafka.emersonzulian.dev |
 | **Shop** — buy something and follow it through every layer | https://shop.emersonzulian.dev |
 | **Receipts** — FileBrowser, your own folder only (login by the gateway) | https://files.emersonzulian.dev |
-| **Demo app** | https://demo.emersonzulian.dev |
 
 In Argo CD:
 - [the whole tree from the root](https://argocd.emersonzulian.dev/applications/argocd/portfolio?view=tree)
@@ -105,7 +104,7 @@ gitops/            Everything Argo CD applies
  platform/          namespace/  gateway/  network-policies/  policies/  cloudflare-tunnel/
                     external-dns/  kafka/  redis/  authentik/
  observability/     prometheus/  loki/  tempo/  opentelemetry/  grafana/
- apps/              landing/  status/  shop/  files/  kafka-ui/  demo/
+ apps/              landing/  status/  shop/  files/  kafka-ui/  traffic/
 shop/              The shop's source: web/ (Next.js), orders/ and payments/ (.NET)
 .github/workflows/ CI: builds the shop's images to ghcr.io/emersonhzulian/portfolio-platform/*
 ```
@@ -137,7 +136,7 @@ and Tempo are Helm charts; their folders hold only `values.yaml`.
 | | `apps-shop` (0) | The shop ([source](shop/)): web (Next.js), orders and payments (.NET), PostgreSQL |
 | | `apps-files` (0) | FileBrowser behind the gateway's OIDC (SecurityPolicy: authentik login + JWT → `X-Auth-User`), one folder per visitor, download only |
 | | `apps-kafka-ui` (0) | Kafbat UI: read-only in the UI and at the broker (SCRAM user with read-only ACLs) |
-| | `apps-demo` (0) | ASP.NET sample, auto-instrumented, plus background traffic |
+| | `apps-traffic` (0) | Synthetic shopper (k6): browses and buys through the public URL, metrics by remote write |
 
 ---
 
@@ -275,7 +274,7 @@ for p in /login /api/datasources/proxy/uid/prometheus/api/v1/targets \
   printf '%s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' $G$p)" "$p"   # all 404
 done
 curl -s -X POST -H 'Content-Type: application/json' \
-  https://argocd.emersonzulian.dev/api/v1/applications/apps-demo/sync -d '{}'   # permission denied
+  https://argocd.emersonzulian.dev/api/v1/applications/apps-shop/sync -d '{}'   # permission denied
 ```
 
 ### Rules for this repository

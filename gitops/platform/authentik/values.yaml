@@ -27,6 +27,9 @@ global:
     # FILES_OIDC_CLIENT_SECRET, same idea (FileBrowser's gateway OIDC client).
     - secretRef:
         name: files-oidc
+    # SHOPPER_PASSWORD (manifests/bot-accounts.yaml).
+    - secretRef:
+        name: shopper-credentials
   env:
     - name: AUTHENTIK_POSTGRESQL__PASSWORD
       valueFrom:

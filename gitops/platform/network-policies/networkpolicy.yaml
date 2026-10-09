@@ -79,7 +79,7 @@ spec:
     matchExpressions:
       - key: app
         operator: In
-        values: [landing, demo, gatus]
+        values: [landing, gatus]
   policyTypes: [Ingress]
   ingress:
     - from:

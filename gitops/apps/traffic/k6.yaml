@@ -1,0 +1,71 @@
+---
+# Background traffic for the shop (shopper.js): a k6 process that never ends (its scenarios
+# last a year; the Deployment restarts it after that). Its own metrics - request rate,
+# latency, failed checks - go to the portfolio Prometheus by remote write.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synthetic-shopper
+  labels:
+    app: synthetic-shopper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: synthetic-shopper
+  template:
+    metadata:
+      labels:
+        app: synthetic-shopper
+        app.kubernetes.io/name: synthetic-shopper
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: k6
+          image: grafana/k6:2.3.0
+          args:
+            - run
+            - --address=0.0.0.0:6565
+            - --out=experimental-prometheus-rw
+            - --tag=testid=synthetic-shopper
+            - /scripts/shopper.js
+          env:
+            - name: SHOPPER_USERNAME
+              value: synthetic-shopper
+            # Generated in-cluster, and set on the account by authentik's blueprint
+            # (../../platform/authentik/manifests/bot-accounts.yaml).
+            - name: SHOPPER_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: shopper-credentials, key: SHOPPER_PASSWORD}
+            - name: K6_PROMETHEUS_RW_SERVER_URL
+              value: http://prometheus-operated:9090/api/v1/write
+            - name: K6_PROMETHEUS_RW_TREND_STATS
+              value: "p(50),p(95),p(99)"
+            # No usage report to Grafana Labs (egress is default-deny anyway).
+            - name: K6_NO_USAGE_REPORT
+              value: "true"
+          ports:
+            - name: api
+              containerPort: 6565
+          readinessProbe:
+            httpGet: {path: /v1/status, port: api}
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 12345
+            runAsGroup: 12345
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: scripts, mountPath: /scripts, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: scripts
+          configMap:
+            name: synthetic-shopper
+        - name: tmp
+          emptyDir: {}

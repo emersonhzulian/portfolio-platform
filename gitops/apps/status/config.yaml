@@ -52,14 +52,6 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
 
-  - name: Demo app
-    group: Public
-    url: https://demo.emersonzulian.dev/
-    interval: 1m
-    conditions:
-      - "[STATUS] == 200"
-      - "[RESPONSE_TIME] < 2000"
-
   - name: Shop
     group: Public
     url: https://shop.emersonzulian.dev/healthz

@@ -1,0 +1,16 @@
+# Accounts used by automation, kept apart from visitors (path users/bots): the nightly reset
+# only removes users/visitors.
+version: 1
+metadata:
+  name: Portfolio - bots
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+entries:
+  - model: authentik_core.user
+    identifiers:
+      username: synthetic-shopper
+    attrs:
+      name: Synthetic shopper (k6)
+      type: internal
+      path: users/bots
+      password: !Env SHOPPER_PASSWORD

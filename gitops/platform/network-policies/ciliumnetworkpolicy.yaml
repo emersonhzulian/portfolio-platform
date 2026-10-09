@@ -21,7 +21,7 @@ specs:
       matchExpressions:
         - key: app
           operator: In
-          values: [cloudflare-tunnel, external-dns, gatus, shop-web]
+          values: [cloudflare-tunnel, external-dns, gatus, shop-web, synthetic-shopper]
     egress:
       - toEndpoints:
           - matchLabels:
@@ -105,10 +105,13 @@ specs:
           - ports:
               - port: "443"
                 protocol: TCP
-  # Gatus probes the public endpoints the way a visitor does: out to Cloudflare and back in.
+  # The synthetic shopper and Gatus reach the public endpoints the way a visitor does: out to
+  # Cloudflare and back in through the tunnel and the gateway.
   - endpointSelector:
-      matchLabels:
-        app: gatus
+      matchExpressions:
+        - key: app
+          operator: In
+          values: [gatus, synthetic-shopper]
     egress:
       - toFQDNs:
           - matchName: "emersonzulian.dev"

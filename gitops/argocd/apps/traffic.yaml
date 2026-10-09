@@ -1,9 +1,9 @@
 ---
-# Demo: stock ASP.NET sample with .NET auto-instrumentation + background traffic.
+# Traffic: the synthetic shopper (k6) - background visits and purchases through the public URL.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: apps-demo
+  name: apps-traffic
   namespace: argocd
   labels:
     portfolio.emersonzulian.dev/level: component
@@ -17,7 +17,7 @@ spec:
   source:
     repoURL: https://github.com/emersonhzulian/portfolio-platform
     targetRevision: main
-    path: gitops/apps/demo
+    path: gitops/apps/traffic
   destination:
     server: https://kubernetes.default.svc
     namespace: portfolio

@@ -1,0 +1,21 @@
+---
+# Password of `synthetic-shopper` (blueprints/bots.yaml), the account the background traffic
+# logs in and buys with (../../../apps/traffic). Generated in-cluster; authentik sets it on
+# the account (env SHOPPER_PASSWORD), the shopper reads the same Secret.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: shopper-credentials
+spec:
+  refreshPolicy: CreatedOnce
+  target:
+    name: shopper-credentials
+    template:
+      data:
+        SHOPPER_PASSWORD: "{{ .password }}"
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: authentik-client-secret

@@ -5,6 +5,7 @@ kind: Kustomization
 resources:
   - ./externalsecret.yaml
   - ./oidc-clients.yaml
+  - ./bot-accounts.yaml
   - ./database.yaml
   - ./monitoring.yaml
   - ./httproute.yaml
@@ -16,5 +17,6 @@ configMapGenerator:
       - ./blueprints/visitors.yaml
       - ./blueprints/shop.yaml
       - ./blueprints/files.yaml
+      - ./blueprints/bots.yaml
     options:
       disableNameSuffixHash: true
