@@ -59,6 +59,11 @@ In Argo CD:
   stopped by Cloudflare Turnstile) or use the demo account, which is read-only - it can't
   change its password, profile or MFA. Flows, the demo account and OIDC clients are
   blueprints in Git.
+- **Releases and failures, handled by the platform.** The shop's web app is released as a
+  canary (Argo Rollouts): 20% then 50% of real traffic, split on the HTTPRoute, judged on that
+  version's own error rate and latency from Tempo's span metrics - a bad release rolls itself
+  back. Chaos Mesh kills one shop pod every hour; a k6 shopper keeps traffic flowing through
+  the public URL, with a real login, so there's always something to measure.
 - **Messaging and state.** Kafka (Strimzi, KRaft) carries the shop's events; Redis holds
   sessions and rate-limit counters - including the gateway's, which is global across Envoy
   replicas. PostgreSQL databases are CloudNativePG clusters; app credentials are generated
@@ -104,7 +109,7 @@ gitops/            Everything Argo CD applies
  platform/          namespace/  gateway/  network-policies/  policies/  cloudflare-tunnel/
                     external-dns/  kafka/  redis/  authentik/
  observability/     prometheus/  loki/  tempo/  opentelemetry/  grafana/
- apps/              landing/  status/  shop/  files/  kafka-ui/  traffic/
+ apps/              landing/  status/  shop/  files/  kafka-ui/  traffic/  chaos/
 shop/              The shop's source: web/ (Next.js), orders/ and payments/ (.NET)
 .github/workflows/ CI: builds the shop's images to ghcr.io/emersonhzulian/portfolio-platform/*
 ```
@@ -136,6 +141,7 @@ and Tempo are Helm charts; their folders hold only `values.yaml`.
 | | `apps-shop` (0) | The shop ([source](shop/)): web (Next.js), orders and payments (.NET), PostgreSQL |
 | | `apps-files` (0) | FileBrowser behind the gateway's OIDC (SecurityPolicy: authentik login + JWT → `X-Auth-User`), one folder per visitor, download only |
 | | `apps-kafka-ui` (0) | Kafbat UI: read-only in the UI and at the broker (SCRAM user with read-only ACLs) |
+| | `apps-chaos` (0) | Chaos Mesh schedule: one random shop pod killed every hour |
 | | `apps-traffic` (0) | Synthetic shopper (k6): browses and buys through the public URL, metrics by remote write |
 
 ---

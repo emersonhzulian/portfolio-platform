@@ -174,10 +174,11 @@
     </div>
   </div>
 
-  <h2>Building next</h2>
+  <h2>Releases and failures, handled by the platform</h2>
   <div class="grid">
-    <div class="card"><span class="tag next">next</span><h3>Canary releases</h3><p>New versions ship as <b>Argo Rollouts</b> canaries, judged on error rate and latency from the traces, and roll back by themselves.</p></div>
-    <div class="card"><span class="tag next">next</span><h3>Scheduled chaos</h3><p><b>Chaos Mesh</b> kills pods every hour; the status page and the dashboards show that nobody noticed.</p></div>
+    <div class="card"><span class="tag live">live</span><h3>Canary releases</h3><p>The shop's web app ships through <b>Argo Rollouts</b>: 20%, then 50% of the real traffic, split at the gateway, while an analysis watches that version's own error rate and latency from the traces. A deliberately broken release was rolled back on its own within two minutes - see its history in Argo CD.</p></div>
+    <div class="card"><span class="tag live">live</span><h3>Scheduled chaos</h3><p><b>Chaos Mesh</b> kills one of the shop's pods every hour. Two replicas per service on two nodes, disruption budgets and readiness probes mean nobody notices: the status page and the synthetic shopper are the witnesses.</p></div>
+    <div class="card"><span class="tag live">live</span><h3>Synthetic traffic</h3><p>A <b>k6</b> shopper browses every second and buys every few minutes - through the public URL, with a real login - so dashboards, traces and canary analyses always have something to measure.</p></div>
   </div>
 
   <footer>
