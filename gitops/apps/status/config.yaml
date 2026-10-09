@@ -86,7 +86,9 @@ endpoints:
 
   # ---- GitOps ---------------------------------------------------------------------------
   # The root of the app-of-apps: Synced + Healthy means every child app is too (each wave
-  # waits on its children's health).
+  # waits on its children's health). A release in progress isn't an outage: a canary shows
+  # as Progressing while pods start and Suspended while it pauses between steps. Degraded or
+  # Missing still fail, and a canary that never becomes healthy ends up Degraded.
   - name: portfolio (root application)
     group: GitOps
     url: https://argocd.emersonzulian.dev/api/v1/applications/portfolio
@@ -94,7 +96,7 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[BODY].status.sync.status == Synced"
-      - "[BODY].status.health.status == Healthy"
+      - "[BODY].status.health.status == any(Healthy, Progressing, Suspended)"
 
   # ---- Internals ------------------------------------------------------------------------
   - name: Prometheus
