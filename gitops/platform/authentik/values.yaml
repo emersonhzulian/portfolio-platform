@@ -15,6 +15,12 @@ authentik:
     port: 5432
 
 global:
+  # authentik's image runs as uid 1000; said explicitly so admission can check it.
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
   # AUTHENTIK_SECRET_KEY, AUTHENTIK_BOOTSTRAP_PASSWORD and the values the blueprints read
   # (demo password, Turnstile keys) - from OpenBao via manifests/externalsecret.yaml.
   envFrom:

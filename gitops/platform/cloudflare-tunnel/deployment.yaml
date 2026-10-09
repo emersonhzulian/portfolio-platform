@@ -61,6 +61,19 @@ spec:
             failureThreshold: 1
             initialDelaySeconds: 10
             periodSeconds: 10
+          # Ready once it holds a connection to Cloudflare's edge.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532 # the image's `nonroot` user
+            runAsGroup: 65532
+            capabilities: {drop: ["ALL"]}
       dnsPolicy: "ClusterFirst"
       dnsConfig:
         nameservers:

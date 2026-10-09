@@ -10,6 +10,18 @@ metadata:
 spec:
   mode: deployment
   replicas: 1
+  # Readiness/liveness from the health_check extension below (the operator wires the port).
+  readinessProbe:
+    periodSeconds: 10
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    seccompProfile: {type: RuntimeDefault}
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities: {drop: ["ALL"]}
   resources:
     requests:
       cpu: 25m
@@ -17,6 +29,9 @@ spec:
     limits:
       memory: 256Mi
   config:
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
     receivers:
       otlp:
         protocols:
@@ -59,6 +74,7 @@ spec:
         tls:
           insecure: true
     service:
+      extensions: [health_check]
       pipelines:
         logs:
           receivers: [otlp]

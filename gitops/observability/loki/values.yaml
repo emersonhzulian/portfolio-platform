@@ -108,3 +108,8 @@ monitoring:
     # The central Prometheus skips ServiceMonitors with this label (no double scrape).
     labels:
       prometheus.homelab/instance: portfolio
+# The rules sidecar (loki-sc-rules) gets its own requests/limits, like every container here.
+sidecar:
+  resources:
+    requests: {cpu: 5m, memory: 32Mi}
+    limits: {memory: 128Mi}
