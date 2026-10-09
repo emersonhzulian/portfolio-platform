@@ -1,25 +1,47 @@
 ---
 # orders: catalog, orders, the payment webhook and the order.paid event (shop/orders).
 # Called by the web app (with the visitor's access token) and by payments (the webhook).
-apiVersion: apps/v1
-kind: Deployment
+#
+# Released as a canary too, but without a traffic router: orders is only called inside the
+# cluster, through its Service, with no HTTPRoute to weigh. The split is by pods instead - at
+# 50% one of the two replicas runs the new version, and the Service sends it half the requests
+# (and Kafka gives it its share of receipt.ready partitions). The same analysis as web judges
+# that version alone (analysis.yaml). Schema changes have to suit both versions while they run
+# side by side; today the schema is only ever created, never altered (Schema.EnsureAsync).
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: shop-orders
   labels:
     app: shop-orders
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: shop-orders
+  strategy:
+    canary:
+      analysis:
+        templates:
+          - templateName: canary-health
+        args:
+          - name: service
+            value: shop-orders
+          - name: hash
+            valueFrom:
+              podTemplateHashValue: Latest
+      steps:
+        - setWeight: 50
+        - pause: {duration: 4m}
   template:
     metadata:
       labels:
         app: shop-orders
         app.kubernetes.io/name: shop-orders
         app.kubernetes.io/part-of: portfolio-shop
-      annotations:
-        instrumentation.opentelemetry.io/inject-dotnet: "true"
+        # Traced by the OpenTelemetry dotnet agent (../../platform/policies/instrumentation.yaml).
+        portfolio.emersonzulian.dev/instrument: dotnet
     spec:
       automountServiceAccountToken: false
       topologySpreadConstraints:
@@ -29,7 +51,8 @@ spec:
           labelSelector:
             matchLabels:
               app: shop-orders
-          matchLabelKeys: [pod-template-hash]
+          # Rollouts label their pods with rollouts-pod-template-hash, not pod-template-hash.
+          matchLabelKeys: [rollouts-pod-template-hash]
       containers:
         - name: orders
           image: ghcr.io/emersonhzulian/portfolio-platform/orders:0.1.4

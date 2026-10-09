@@ -1,8 +1,8 @@
 ---
 # How a canary is judged, from the traces: Tempo's span metrics (in the portfolio Prometheus)
 # carry the release's rollouts-pod-template-hash, so these look at the new version alone, not
-# at the mix of stable and canary. Checked every 30s while the canary runs; two failed checks
-# abort the rollout.
+# at the mix of stable and canary - and at real requests, not the kubelet's health checks.
+# Checked every 30s while the canary runs; two failed checks abort the rollout.
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
 metadata:
@@ -23,9 +23,9 @@ spec:
           # `or vector(0)`: with no errors the error series doesn't exist at all, and without it
           # the ratio came back empty - a "pass" that measured nothing.
           query: |
-            (sum(rate(traces_spanmetrics_calls_total{service="{{args.service}}", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR", rollouts_pod_template_hash="{{args.hash}}"}[1m])) or vector(0))
+            (sum(rate(traces_spanmetrics_calls_total{service="{{args.service}}", span_kind="SPAN_KIND_SERVER", span_name!~"GET /(healthz|livez)", status_code="STATUS_CODE_ERROR", rollouts_pod_template_hash="{{args.hash}}"}[1m])) or vector(0))
             /
-            sum(rate(traces_spanmetrics_calls_total{service="{{args.service}}", span_kind="SPAN_KIND_SERVER", rollouts_pod_template_hash="{{args.hash}}"}[1m]))
+            sum(rate(traces_spanmetrics_calls_total{service="{{args.service}}", span_kind="SPAN_KIND_SERVER", span_name!~"GET /(healthz|livez)", rollouts_pod_template_hash="{{args.hash}}"}[1m]))
     - name: latency-p95
       interval: 30s
       failureLimit: 2
@@ -34,4 +34,4 @@ spec:
         prometheus:
           address: http://prometheus-operated.portfolio.svc.cluster.local:9090
           query: |
-            histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{service="{{args.service}}", span_kind="SPAN_KIND_SERVER", rollouts_pod_template_hash="{{args.hash}}"}[2m])))
+            histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{service="{{args.service}}", span_kind="SPAN_KIND_SERVER", span_name!~"GET /(healthz|livez)", rollouts_pod_template_hash="{{args.hash}}"}[2m])))

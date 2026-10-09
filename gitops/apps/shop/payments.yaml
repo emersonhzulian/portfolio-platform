@@ -18,8 +18,8 @@ spec:
         app: shop-payments
         app.kubernetes.io/name: shop-payments
         app.kubernetes.io/part-of: portfolio-shop
-      annotations:
-        instrumentation.opentelemetry.io/inject-dotnet: "true"
+        # Traced by the OpenTelemetry dotnet agent (../../platform/policies/instrumentation.yaml).
+        portfolio.emersonzulian.dev/instrument: dotnet
     spec:
       automountServiceAccountToken: false
       topologySpreadConstraints:

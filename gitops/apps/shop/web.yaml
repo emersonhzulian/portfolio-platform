@@ -49,8 +49,8 @@ spec:
         app: shop-web
         app.kubernetes.io/name: shop-web
         app.kubernetes.io/part-of: portfolio-shop
-      annotations:
-        instrumentation.opentelemetry.io/inject-nodejs: "true"
+        # Traced by the OpenTelemetry nodejs agent (../../platform/policies/instrumentation.yaml).
+        portfolio.emersonzulian.dev/instrument: nodejs
     spec:
       automountServiceAccountToken: false
       topologySpreadConstraints:
