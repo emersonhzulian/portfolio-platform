@@ -69,6 +69,10 @@ spec:
             - name: http
               containerPort: 3000
           env:
+            # Set explicitly: the OpenTelemetry Operator names a service after the pod's owner,
+            # and for a Rollout that's the ReplicaSet (shop-web-<hash>), a new name each release.
+            - name: OTEL_SERVICE_NAME
+              value: shop-web
             - name: APP_URL
               value: https://shop.emersonzulian.dev
             - name: OIDC_ISSUER
