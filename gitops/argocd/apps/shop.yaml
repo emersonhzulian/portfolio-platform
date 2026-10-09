@@ -21,12 +21,33 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: portfolio
+  # Argo Rollouts drives these fields during a canary: the backend weights on the HTTPRoute,
+  # and the stable/canary Services' version selector and ownership annotation. Without this,
+  # self-heal would put them back mid-release.
+  ignoreDifferences:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: shop
+      jqPathExpressions:
+        - .spec.rules[].backendRefs[].weight
+    - group: ""
+      kind: Service
+      name: shop-web
+      jqPathExpressions: &rollouts-service-fields
+        - .spec.selector["rollouts-pod-template-hash"]
+        - .metadata.annotations["argo-rollouts.argoproj.io/managed-by-rollouts"]
+    - group: ""
+      kind: Service
+      name: shop-web-canary
+      jqPathExpressions: *rollouts-service-fields
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - ServerSideApply=true
+      # Also when applying, not only when comparing: a sync mustn't reset the weights.
+      - RespectIgnoreDifferences=true
     retry:
       limit: 10
       backoff:

@@ -38,6 +38,12 @@ spec:
           metadata:
             - k8s.deployment.name
             - k8s.node.name
+          # Which release a span came from: Argo Rollouts labels each version's pods with
+          # its template hash, and the canary analysis compares that version alone.
+          labels:
+            - tag_name: rollouts.pod_template_hash
+              key: rollouts-pod-template-hash
+              from: pod
         pod_association:
           - sources:
               - from: resource_attribute

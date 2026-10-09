@@ -8,5 +8,6 @@ resources:
   - ./payments.yaml
   - ./orders.yaml
   - ./web.yaml
+  - ./analysis.yaml
   - ./receipts.yaml
   - ./reset.yaml

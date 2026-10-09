@@ -1,0 +1,35 @@
+---
+# How a canary is judged, from the traces: Tempo's span metrics (in the portfolio Prometheus)
+# carry the release's rollouts-pod-template-hash, so these look at the new version alone, not
+# at the mix of stable and canary. Checked every 30s while the canary runs; two failed checks
+# abort the rollout.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: canary-health
+spec:
+  args:
+    - name: service
+    - name: hash
+  metrics:
+    - name: error-rate
+      interval: 30s
+      failureLimit: 2
+      # No requests yet (NaN / empty) isn't a failure; more than 5% errors is.
+      successCondition: len(result) == 0 || isNaN(result[0]) || result[0] <= 0.05
+      provider:
+        prometheus:
+          address: http://prometheus-operated.portfolio.svc.cluster.local:9090
+          query: |
+            sum(rate(traces_spanmetrics_calls_total{service="{{args.service}}", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR", rollouts_pod_template_hash="{{args.hash}}"}[1m]))
+            /
+            sum(rate(traces_spanmetrics_calls_total{service="{{args.service}}", span_kind="SPAN_KIND_SERVER", rollouts_pod_template_hash="{{args.hash}}"}[1m]))
+    - name: latency-p95
+      interval: 30s
+      failureLimit: 2
+      successCondition: len(result) == 0 || isNaN(result[0]) || result[0] <= 1.5
+      provider:
+        prometheus:
+          address: http://prometheus-operated.portfolio.svc.cluster.local:9090
+          query: |
+            histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{service="{{args.service}}", span_kind="SPAN_KIND_SERVER", rollouts_pod_template_hash="{{args.hash}}"}[2m])))

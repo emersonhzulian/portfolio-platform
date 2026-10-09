@@ -115,6 +115,13 @@ spec:
             matchLabels:
               app.kubernetes.io/name: envoy
               app.kubernetes.io/component: proxy
+        # Argo Rollouts' controller runs the canary analysis queries.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: argo-rollouts
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argo-rollouts
       ports:
         - port: 9090
           protocol: TCP

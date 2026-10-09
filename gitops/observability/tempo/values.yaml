@@ -33,6 +33,12 @@ tempo:
         processors:
           - service-graphs
           - span-metrics
+        processor:
+          span_metrics:
+            # Request rate/errors/latency per release, so a canary is judged on its own
+            # numbers (label rollouts_pod_template_hash; empty for non-Rollout workloads).
+            dimensions:
+              - rollouts.pod_template_hash
   metricsGenerator:
     enabled: true
     # The portfolio Prometheus (../prometheus), not the central one.
