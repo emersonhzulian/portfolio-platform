@@ -167,6 +167,9 @@ entries:
   # password, not its username (which would make it disappear for everyone), and no MFA
   # (whoever enrolled a TOTP would lock everybody else out). The flows the portal uses for
   # those changes are denied to `demo`; everyone else uses them normally.
+  # Bindings point at their flow with !KeyOf, not !Find: KeyOf yields the id policy bindings
+  # use (pbm_uuid); with !Find, re-applying the blueprint couldn't match the existing binding,
+  # tried to create it again and failed the whole blueprint.
   - model: authentik_policies_expression.expressionpolicy
     id: not-demo
     identifiers:
@@ -178,6 +181,7 @@ entries:
             return False
         return True
   - model: authentik_flows.flow
+    id: flow-password-change
     identifiers:
       slug: default-password-change
     attrs:
@@ -186,9 +190,10 @@ entries:
   - model: authentik_policies.policybinding
     identifiers:
       order: 0
-      target: !Find [authentik_flows.flow, [slug, default-password-change]]
+      target: !KeyOf flow-password-change
       policy: !KeyOf not-demo
   - model: authentik_flows.flow
+    id: flow-user-settings-flow
     identifiers:
       slug: default-user-settings-flow
     attrs:
@@ -197,9 +202,10 @@ entries:
   - model: authentik_policies.policybinding
     identifiers:
       order: 0
-      target: !Find [authentik_flows.flow, [slug, default-user-settings-flow]]
+      target: !KeyOf flow-user-settings-flow
       policy: !KeyOf not-demo
   - model: authentik_flows.flow
+    id: flow-authenticator-totp-setup
     identifiers:
       slug: default-authenticator-totp-setup
     attrs:
@@ -208,9 +214,10 @@ entries:
   - model: authentik_policies.policybinding
     identifiers:
       order: 0
-      target: !Find [authentik_flows.flow, [slug, default-authenticator-totp-setup]]
+      target: !KeyOf flow-authenticator-totp-setup
       policy: !KeyOf not-demo
   - model: authentik_flows.flow
+    id: flow-authenticator-webauthn-setup
     identifiers:
       slug: default-authenticator-webauthn-setup
     attrs:
@@ -219,9 +226,10 @@ entries:
   - model: authentik_policies.policybinding
     identifiers:
       order: 0
-      target: !Find [authentik_flows.flow, [slug, default-authenticator-webauthn-setup]]
+      target: !KeyOf flow-authenticator-webauthn-setup
       policy: !KeyOf not-demo
   - model: authentik_flows.flow
+    id: flow-authenticator-static-setup
     identifiers:
       slug: default-authenticator-static-setup
     attrs:
@@ -230,7 +238,7 @@ entries:
   - model: authentik_policies.policybinding
     identifiers:
       order: 0
-      target: !Find [authentik_flows.flow, [slug, default-authenticator-static-setup]]
+      target: !KeyOf flow-authenticator-static-setup
       policy: !KeyOf not-demo
 
   # --- The public demo account ---------------------------------------------------------
