@@ -1,5 +1,5 @@
 ---
-# Kyverno policies (CEL): pin pods to the node pool, workload rules (Deny / Audit).
+# Kyverno policies (CEL): pin pods to the node pool, workload rules (all Deny).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

@@ -4,10 +4,9 @@
 # policies (so they live in this folder and show up in Argo CD), background scans and
 # PolicyReports.
 #
-# Most run in Audit: violations land in PolicyReports (and on the platform dashboard)
-# without blocking anything, which is how a rule earns its way to Deny - fix what it reports,
-# then flip it. Mutable tags are already denied: nothing here uses one, and a deploy that
-# pins nothing can't be rolled back to a known state.
+# All of them deny. Each started in Audit - violations in PolicyReports (and on the platform
+# dashboard), nothing blocked - and was flipped once what it reported was fixed; a new rule
+# should take the same path. Background scans keep reporting on running pods either way.
 #
 # Rules are written against Pods; autogen applies them to the pod templates of Deployments,
 # StatefulSets, DaemonSets, Jobs and CronJobs too, so a bad manifest is refused when Argo CD
@@ -48,7 +47,7 @@ kind: NamespacedValidatingPolicy
 metadata:
   name: allowed-registries
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
   evaluation:
     background:
       enabled: true
@@ -81,7 +80,7 @@ kind: NamespacedValidatingPolicy
 metadata:
   name: require-resources
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
   evaluation:
     background:
       enabled: true
@@ -107,7 +106,7 @@ kind: NamespacedValidatingPolicy
 metadata:
   name: require-readiness-probe
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
   evaluation:
     background:
       enabled: true
@@ -135,7 +134,7 @@ kind: NamespacedValidatingPolicy
 metadata:
   name: require-non-root
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
   evaluation:
     background:
       enabled: true

@@ -53,8 +53,9 @@ In Argo CD:
   namespace's data. None of it is shared with the rest of the homelab. Every pod here runs on
   a dedicated node pool (two nodes), placed there by policy, not by each manifest.
 - **Policy as code (Kyverno, in CEL).** Admission policies pin pods to the pool, refuse
-  mutable image tags, and audit registries, resources, readiness probes and non-root - each
-  rule starts in Audit and moves to Deny once nothing violates it.
+  mutable image tags, images from unknown registries, and containers without requests, a
+  readiness probe or non-root - each rule started in Audit and moved to Deny once nothing
+  violated it.
 - **Identity (authentik).** Visitors sign up with a username and password (no e-mail; bots
   stopped by Cloudflare Turnstile) or use the demo account, which is read-only - it can't
   change its password, profile or MFA. Flows, the demo account and OIDC clients are
@@ -266,7 +267,9 @@ limits and the pods' memory limits keep any damage inside this namespace's own s
 4. Add an Application for it in `gitops/argocd/apps/`.
 
 The namespace's policies apply on admission: pin image tags (no `:latest`); give containers
-requests, a memory limit, a readiness probe and `runAsNonRoot` (audited); pods are placed on
+requests, a memory limit, a readiness probe (not Job pods) and `runAsNonRoot`; images from
+docker.io, ghcr.io, quay.io, registry.k8s.io or mcr.microsoft.com. A manifest that breaks one is
+refused when Argo CD applies it. Pods are placed on
 the node pool automatically. With several replicas, spread them with
 `topologySpreadConstraints` on `kubernetes.io/hostname` and `matchLabelKeys: [pod-template-hash]`
 - without it, a rolling update can leave every replica on one node.

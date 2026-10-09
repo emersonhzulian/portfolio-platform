@@ -26,6 +26,8 @@ spec:
           labelSelector:
             matchLabels:
               app: cloudflare-tunnel
+          # Count only this revision's pods: during a rollout the old ones would skew it.
+          matchLabelKeys: [pod-template-hash]
       containers:
         - name: cloudflared
           image: cloudflare/cloudflared:2026.10.0

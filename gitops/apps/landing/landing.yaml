@@ -21,10 +21,12 @@ spec:
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
+          whenUnsatisfiable: DoNotSchedule
           labelSelector:
             matchLabels:
               app: landing
+          # Count only this revision's pods: during a rollout the old ones would skew it.
+          matchLabelKeys: [pod-template-hash]
       automountServiceAccountToken: false
       containers:
         - name: nginx
