@@ -62,12 +62,31 @@
   <h1>A small platform, run like a real one.</h1>
   <p class="lede">
     This is a Kubernetes platform running in my homelab, reachable from the internet with zero open
-    ports. Everything here is live, deployed by GitOps and observable. You can open it, query it
-    and watch it work.
+    ports. Everything here is live, deployed by GitOps and observable - and there's a small shop
+    running on it, so you can use it, not just look at it.
   </p>
+
+  <h2>Follow your own purchase</h2>
+  <ol class="journey">
+    <li><a href="https://shop.emersonzulian.dev">Open the shop</a> and sign up (a username and a password, no e-mail) - or use the demo account shown on the login page.</li>
+    <li>Buy something. Payment is simulated (Pix, no money moves) and confirmed by a webhook a few seconds later; the order page shows each step as it happens.</li>
+    <li>The "paid" event goes through <b>Kafka</b>; a worker writes your PDF receipt, which you <a href="https://files.emersonzulian.dev">download from your own folder</a>.</li>
+    <li>On the order page, open its trace in <b>Grafana</b>: one trace, four services - the web request, the payment, its webhook, the Kafka event, the receipt and back.</li>
+    <li>See the event itself in the <a href="https://kafka.emersonzulian.dev">Kafka UI</a>, and the deployment it ran on in <a href="https://argocd.emersonzulian.dev/applications/argocd/portfolio?view=tree">Argo CD</a>.</li>
+  </ol>
 
   <h2>Try it</h2>
   <div class="grid">
+    <a class="card" href="https://shop.emersonzulian.dev">
+      <span class="tag live">live</span>
+      <h3>Shop</h3>
+      <p>Next.js storefront, .NET orders and payments, a Node.js receipts worker. OIDC login, sessions and rate limits in Redis, PostgreSQL on CloudNativePG.</p>
+    </a>
+    <a class="card" href="https://files.emersonzulian.dev">
+      <span class="tag live">live</span>
+      <h3>Your receipts</h3>
+      <p>FileBrowser behind the gateway's own OIDC login: you see your folder and nothing else, and can only download.</p>
+    </a>
     <a class="card" href="https://grafana.emersonzulian.dev">
       <span class="tag live">live</span>
       <h3>Grafana</h3>
@@ -143,22 +162,27 @@
       <p><b>OpenTelemetry Operator</b> auto-instrumentation sends traces and logs to <b>Tempo</b> and <b>Loki</b>. Span metrics go to <b>Prometheus</b>. This stack is separate from the rest of the homelab's.</p>
     </div>
     <div class="card">
+      <h3>Identity</h3>
+      <p><b>authentik</b>: sign-up behind Cloudflare <b>Turnstile</b>, a read-only demo account, OIDC for the shop and - through the gateway itself - for FileBrowser. Flows and clients are blueprints in Git.</p>
+    </div>
+    <div class="card">
+      <h3>Messaging</h3>
+      <p><b>Kafka</b> via <b>Strimzi</b> (KRaft). A transactional outbox publishes the shop's events; the trace context travels in the message headers. The public UI's user is read-only at the broker (ACLs).</p>
+    </div>
+    <div class="card">
+      <h3>Policy</h3>
+      <p><b>Kyverno</b>, in CEL: pods are pinned to a dedicated node pool, mutable image tags are refused, and workload rules are audited on their way to being enforced.</p>
+    </div>
+    <div class="card">
       <h3>Nodes</h3>
-      <p><b>Talos Linux</b>: immutable, API-driven and with no SSH. Messaging uses the <b>Strimzi</b> operator for Kafka.</p>
+      <p><b>Talos Linux</b>: immutable, API-driven and with no SSH. This namespace runs on its own pool of two nodes, one replica of each service per node.</p>
     </div>
   </div>
 
   <h2>Building next</h2>
-  <p>A small shop built for this platform (.NET + Node), designed so that you can follow your own click through every layer:</p>
-  <ol class="journey">
-    <li>Create an account (<b>Authentik</b>) and buy something.</li>
-    <li>Payment is simulated, and the "paid" event goes through <b>Kafka</b>. A worker writes your receipt, and you download it from <b>FileBrowser</b>.</li>
-    <li>Open <b>Grafana</b> filtered to your user and see the request as one trace across four services.</li>
-    <li>New versions ship as <b>Argo Rollouts</b> canaries that roll back by themselves when error rate rises. <b>Kyverno</b> enforces the rules. Scheduled <b>chaos</b> kills pods every hour, and the status page shows that nobody noticed.</li>
-  </ol>
-  <div class="grid" style="margin-top:16px">
-    <div class="card"><span class="tag next">next</span><h3>Shop + Kafka + receipts</h3><p>Redis for sessions and rate limits, Postgres on CloudNativePG.</p></div>
-    <div class="card"><span class="tag next">next</span><h3>Progressive delivery &amp; policy</h3><p>Argo Rollouts, Kyverno and Chaos Mesh.</p></div>
+  <div class="grid">
+    <div class="card"><span class="tag next">next</span><h3>Canary releases</h3><p>New versions ship as <b>Argo Rollouts</b> canaries, judged on error rate and latency from the traces, and roll back by themselves.</p></div>
+    <div class="card"><span class="tag next">next</span><h3>Scheduled chaos</h3><p><b>Chaos Mesh</b> kills pods every hour; the status page and the dashboards show that nobody noticed.</p></div>
   </div>
 
   <footer>
