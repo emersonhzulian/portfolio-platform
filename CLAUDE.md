@@ -17,8 +17,10 @@ namespace of my homelab cluster; `shop/` is the source of the app that runs on i
 - **Network:** the namespace is default-deny both ways. Native `NetworkPolicy` first
   (`gitops/platform/network-policies/networkpolicy.yaml`); `ciliumnetworkpolicy.yaml` only for
   egress by hostname (add the app to `dns-proxy`), the API server and the kubelets.
-- **Policies (Kyverno, CEL):** pods get the node-pool `nodeSelector` automatically; images must be
-  pinned; containers need requests, a memory limit, a readiness probe and `runAsNonRoot`. Test a
+- **Policies (Kyverno, CEL):** pods get the node-pool `nodeSelector` automatically, and the
+  OpenTelemetry agent when labelled `portfolio.emersonzulian.dev/instrument: dotnet|nodejs`;
+  images must be pinned; pods need `app.kubernetes.io/name`; containers need requests, a memory
+  limit, a readiness probe and `runAsNonRoot`. Test a
   new mutating policy with a probe policy first - a failing patch with `failurePolicy: Fail`
   denies every pod.
 - **Replicas:** spread with `topologySpreadConstraints` on `kubernetes.io/hostname` plus
