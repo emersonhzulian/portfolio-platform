@@ -73,6 +73,10 @@ spec:
             # and for a Rollout that's the ReplicaSet (shop-web-<hash>), a new name each release.
             - name: OTEL_SERVICE_NAME
               value: shop-web
+            # A deliberately bad release: half the requests fail. Argo Rollouts' analysis must
+            # catch it on the canary's 20% and roll back on its own.
+            - name: FAULT_ERROR_RATE
+              value: "50"
             - name: APP_URL
               value: https://shop.emersonzulian.dev
             - name: OIDC_ISSUER
