@@ -15,5 +15,6 @@ configMapGenerator:
     files:
       - ./blueprints/visitors.yaml
       - ./blueprints/shop.yaml
+      - ./blueprints/files.yaml
     options:
       disableNameSuffixHash: true

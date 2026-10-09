@@ -1,0 +1,92 @@
+---
+# receipts (shop/receipts): order.paid -> PDF receipt in the visitor's folder -> receipt.ready.
+# Two replicas share the topic's partitions (consumer group `receipts`).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-receipts
+  labels:
+    app: shop-receipts
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shop-receipts
+  template:
+    metadata:
+      labels:
+        app: shop-receipts
+        app.kubernetes.io/name: shop-receipts
+        app.kubernetes.io/part-of: portfolio-shop
+      annotations:
+        instrumentation.opentelemetry.io/inject-nodejs: "true"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: shop-receipts
+          matchLabelKeys: [pod-template-hash]
+      containers:
+        - name: receipts
+          image: ghcr.io/emersonhzulian/portfolio-platform/receipts:0.1.3
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: portfolio-kafka-bootstrap:9092
+            - name: RECEIPTS_ROOT
+              value: /receipts
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+          livenessProbe:
+            httpGet: {path: /livez, port: http}
+          resources:
+            requests: {cpu: 25m, memory: 96Mi}
+            limits: {memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: receipts, mountPath: /receipts}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: receipts
+          persistentVolumeClaim:
+            claimName: shop-receipts
+        - name: tmp
+          emptyDir: {}
+---
+# The receipts, one folder per visitor (users/<name>). Shared: receipts writes them, FileBrowser
+# (../files) serves them - hence NFS (ReadWriteMany), unlike the block volumes elsewhere.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shop-receipts
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: freenas-nfs-csi
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: shop-receipts
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: shop-receipts

@@ -75,6 +75,16 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
 
+  # Behind the gateway's login: an anonymous request must be sent to authentik.
+  - name: Receipts (FileBrowser)
+    group: Public
+    url: https://files.emersonzulian.dev/
+    interval: 1m
+    client:
+      dont-follow-redirects: true
+    conditions:
+      - "[STATUS] == 302"
+
   - name: Sign-up / login (authentik)
     group: Public
     url: https://auth.emersonzulian.dev/-/health/ready/

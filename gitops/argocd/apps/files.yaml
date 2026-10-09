@@ -1,0 +1,35 @@
+---
+# Files: FileBrowser for receipts, behind the gateway's OIDC login.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apps-files
+  namespace: argocd
+  labels:
+    portfolio.emersonzulian.dev/level: component
+    portfolio.emersonzulian.dev/group: apps
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/background
+spec:
+  project: portfolio
+  source:
+    repoURL: https://github.com/emersonhzulian/portfolio-platform
+    targetRevision: main
+    path: gitops/apps/files
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: portfolio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

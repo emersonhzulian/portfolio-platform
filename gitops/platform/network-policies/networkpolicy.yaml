@@ -9,9 +9,11 @@
 # The model:
 #   - Inside the namespace, pods talk freely (apps -> collector -> Loki/Tempo -> Prometheus).
 #     The namespace is the trust boundary.
-#   - Grafana and the Kafka UI are the exceptions: both are public tools visitors drive, so
-#     each keeps its own, narrower policy (Grafana: ../../observability/grafana/networkpolicy.yaml,
-#     Kafka UI: `kafka-ui` below) and is left out of `same-namespace`. Policies only ever add
+#   - Grafana and the Kafka UI are exceptions: both are public tools visitors drive, so each
+#     keeps its own, narrower policy (Grafana: ../../observability/grafana/networkpolicy.yaml,
+#     Kafka UI: `kafka-ui` below) and is left out of `same-namespace`. FileBrowser too
+#     (`filebrowser` below): it trusts the X-Auth-User header the gateway sets, so nothing
+#     but the gateway may reach it. Policies only ever add
 #     allows, so selecting them there would widen what they can reach.
 #
 # Kubelet probes come from the host and stay allowed (Cilium's default for host traffic).
@@ -55,7 +57,7 @@ spec:
     matchExpressions:
       - key: app
         operator: NotIn
-        values: [grafana, kafka-ui]
+        values: [grafana, kafka-ui, filebrowser]
   policyTypes: [Ingress, Egress]
   ingress:
     # Anything from inside the namespace (Grafana included, as a client of the datasources).
@@ -331,3 +333,29 @@ spec:
       ports:
         - port: 9093
           protocol: TCP
+---
+# FileBrowser trusts X-Auth-User, which the gateway writes from a verified authentik token
+# (apps/files/security.yaml). So the gateway is the only thing allowed to reach it: from any
+# other pod, that header would be a forgeable login.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: filebrowser
+spec:
+  podSelector:
+    matchLabels:
+      app: filebrowser
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+      ports:
+        - port: 8080
+          protocol: TCP
+  # No egress beyond DNS (allow-dns): it serves files from its volume and calls nothing.

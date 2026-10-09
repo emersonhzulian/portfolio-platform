@@ -13,6 +13,8 @@ this repository is live.
 | **Argo CD** (read-only) — everything this folder runs | https://argocd.emersonzulian.dev |
 | **Sign up / log in** — authentik, with a read-only demo account | https://auth.emersonzulian.dev |
 | **Kafka** (read-only) — topics, consumer groups and the shop's events | https://kafka.emersonzulian.dev |
+| **Shop** — buy something and follow it through every layer | https://shop.emersonzulian.dev |
+| **Receipts** — FileBrowser, your own folder only (login by the gateway) | https://files.emersonzulian.dev |
 | **Demo app** | https://demo.emersonzulian.dev |
 
 In Argo CD:
@@ -103,7 +105,7 @@ gitops/            Everything Argo CD applies
  platform/          namespace/  gateway/  network-policies/  policies/  cloudflare-tunnel/
                     external-dns/  kafka/  redis/  authentik/
  observability/     prometheus/  loki/  tempo/  opentelemetry/  grafana/
- apps/              landing/  status/  shop/  kafka-ui/  demo/
+ apps/              landing/  status/  shop/  files/  kafka-ui/  demo/
 shop/              The shop's source: web/ (Next.js), orders/ and payments/ (.NET)
 .github/workflows/ CI: builds the shop's images to ghcr.io/emersonhzulian/portfolio-platform/*
 ```
@@ -133,6 +135,7 @@ and Tempo are Helm charts; their folders hold only `values.yaml`.
 | apps (2) | `apps-landing` (0) | Static front page at the apex, two nginx replicas |
 | | `apps-status` (0) | Gatus: public endpoints probed from outside, Argo CD sync state, backends |
 | | `apps-shop` (0) | The shop ([source](shop/)): web (Next.js), orders and payments (.NET), PostgreSQL |
+| | `apps-files` (0) | FileBrowser behind the gateway's OIDC (SecurityPolicy: authentik login + JWT → `X-Auth-User`), one folder per visitor, download only |
 | | `apps-kafka-ui` (0) | Kafbat UI: read-only in the UI and at the broker (SCRAM user with read-only ACLs) |
 | | `apps-demo` (0) | ASP.NET sample, auto-instrumented, plus background traffic |
 

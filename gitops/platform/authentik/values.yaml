@@ -24,6 +24,9 @@ global:
     # so authentik waits for it rather than registering the shop with an empty secret.
     - secretRef:
         name: shop-oidc
+    # FILES_OIDC_CLIENT_SECRET, same idea (FileBrowser's gateway OIDC client).
+    - secretRef:
+        name: files-oidc
   env:
     - name: AUTHENTIK_POSTGRESQL__PASSWORD
       valueFrom:

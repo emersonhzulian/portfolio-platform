@@ -1,0 +1,38 @@
+---
+# The gateway logs visitors in before anything reaches FileBrowser:
+#   oidc - authorization code flow with authentik (client portfolio-files), session cookies on
+#          files.emersonzulian.dev, the access token forwarded upstream;
+#   jwt  - verifies that token against authentik's keys and copies preferred_username into
+#          X-Auth-User, overwriting whatever the client may have sent in that header.
+# FileBrowser only accepts traffic from the gateways (network policy), so the header can't be
+# forged by going around them.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: files
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: files
+  oidc:
+    provider:
+      issuer: https://auth.emersonzulian.dev/application/o/portfolio-files/
+    clientID: portfolio-files
+    # Generated on authentik's side (../../platform/authentik/manifests/oidc-clients.yaml).
+    clientSecret:
+      name: files-oidc
+    redirectURL: https://files.emersonzulian.dev/oauth2/callback
+    logoutPath: /logout
+    scopes: [openid, profile]
+    forwardAccessToken: true
+  jwt:
+    providers:
+      - name: authentik
+        issuer: https://auth.emersonzulian.dev/application/o/portfolio-files/
+        audiences: [portfolio-files]
+        remoteJWKS:
+          uri: https://auth.emersonzulian.dev/application/o/portfolio-files/jwks/
+        claimToHeaders:
+          - claim: preferred_username
+            header: X-Auth-User

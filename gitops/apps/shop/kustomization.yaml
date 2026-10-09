@@ -8,3 +8,4 @@ resources:
   - ./payments.yaml
   - ./orders.yaml
   - ./web.yaml
+  - ./receipts.yaml
