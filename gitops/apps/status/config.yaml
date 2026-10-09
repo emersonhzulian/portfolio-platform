@@ -73,7 +73,7 @@ endpoints:
     url: https://files.emersonzulian.dev/
     interval: 1m
     client:
-      dont-follow-redirects: true
+      ignore-redirect: true
     conditions:
       - "[STATUS] == 302"
 
