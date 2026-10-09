@@ -48,6 +48,9 @@ spec:
       - ServerSideApply=true
       # Also when applying, not only when comparing: a sync mustn't reset the weights.
       - RespectIgnoreDifferences=true
+      # Delete what left Git only after the rest is applied and healthy - e.g. a Deployment
+      # replaced by a Rollout keeps serving until the Rollout's pods are ready.
+      - PruneLast=true
     retry:
       limit: 10
       backoff:
