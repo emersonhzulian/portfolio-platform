@@ -1,0 +1,26 @@
+---
+# Scheduled chaos (Chaos Mesh): once an hour, one random pod of the shop is killed - web,
+# orders, payments or receipts. Each of them runs two replicas, one per node, behind a
+# PodDisruptionBudget and a readiness probe; their state lives in PostgreSQL, Redis and Kafka,
+# not in the pods. So nobody should notice: the status page (probing from outside every
+# minute) and the synthetic shopper (buying every few minutes) are the witnesses, and the
+# kill shows up in Argo CD as a fresh PodChaos under this schedule.
+#
+# The namespace opted in (annotation chaos-mesh.org/inject=enabled); Chaos Mesh can't touch
+# anything else in the cluster.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: shop-pod-kill
+spec:
+  schedule: "17 * * * *"
+  type: PodChaos
+  concurrencyPolicy: Forbid
+  historyLimit: 24
+  podChaos:
+    action: pod-kill
+    mode: one
+    selector:
+      namespaces: [portfolio]
+      labelSelectors:
+        app.kubernetes.io/part-of: portfolio-shop
