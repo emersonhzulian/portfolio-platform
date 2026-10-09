@@ -1,0 +1,1242 @@
+---
+# The shop's own dashboard: rate, errors and duration per service (Tempo's span metrics), Kafka
+# lag and DLQ, replicas through the hourly chaos kill, and - with the `user` variable - one
+# visitor's traces and logs. The web app's "See all of it in Grafana" opens it with
+# ?var-user=<their username>. Anonymous visitors see it at /d/portfolio-shop.
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/grafana.integreatly.org/grafanadashboard_v1beta1.json
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: portfolio-shop
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  resyncPeriod: 1m
+  instanceSelector:
+    matchLabels:
+      grafana.internal/instance: portfolio
+  json: |
+    {
+      "title": "Shop",
+      "uid": "portfolio-shop",
+      "description": "The demo shop: rate, errors and duration per service, Kafka, resilience, and one visitor's purchases.",
+      "schemaVersion": 39,
+      "editable": false,
+      "refresh": "30s",
+      "time": {
+        "from": "now-3h",
+        "to": "now"
+      },
+      "tags": [
+        "portfolio",
+        "shop"
+      ],
+      "links": [
+        {
+          "title": "Portfolio overview",
+          "type": "link",
+          "url": "/d/portfolio-overview",
+          "icon": "dashboard"
+        },
+        {
+          "title": "Platform",
+          "type": "link",
+          "url": "/d/portfolio-platform",
+          "icon": "dashboard"
+        },
+        {
+          "title": "The shop",
+          "type": "link",
+          "url": "https://shop.emersonzulian.dev",
+          "icon": "external link",
+          "targetBlank": true
+        }
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "user",
+            "label": "user",
+            "type": "textbox",
+            "description": "Your shop username. The default is the bot that buys something every few minutes.",
+            "query": "synthetic-shopper",
+            "current": {
+              "text": "synthetic-shopper",
+              "value": "synthetic-shopper"
+            },
+            "options": [
+              {
+                "selected": true,
+                "text": "synthetic-shopper",
+                "value": "synthetic-shopper"
+              }
+            ]
+          }
+        ]
+      },
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          },
+          {
+            "name": "Pod started",
+            "enable": true,
+            "iconColor": "orange",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "(time() - kube_pod_created{namespace=\"portfolio\", pod=~\"shop-(web|orders|payments|receipts)-.+\"}) < 60",
+            "step": "30s",
+            "titleFormat": "Pod started",
+            "textFormat": "{{pod}}",
+            "tagKeys": ""
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "text",
+          "title": "",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 3
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "**The shop, from the inside.** Every request and every Kafka message is a span (OpenTelemetry auto-instrumentation in .NET and Node); Tempo turns them into the rate, error and latency series below, and links each one back to its trace and its logs. Vertical marks are pods starting: Chaos Mesh kills one shop pod every hour (at :17), and canary releases replace them too - the replica and consumer panels show the dip, the error rate shouldn't. **Type your username in `user`** to see your own purchases at the bottom."
+          }
+        },
+        {
+          "id": 2,
+          "type": "row",
+          "title": "At a glance",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 3,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Orders (last hour)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 4,
+            "w": 4,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(increase(traces_spanmetrics_calls_total{service=\"shop-orders\", span_kind=\"SPAN_KIND_SERVER\", span_name=\"POST /orders/\"}[1h])) or vector(0)",
+              "instant": false
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Receipts written (last hour)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 4,
+            "y": 4,
+            "w": 4,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(increase(traces_spanmetrics_calls_total{service=\"shop-receipts\", span_name=\"order.paid process\", status_code!=\"STATUS_CODE_ERROR\"}[1h])) or vector(0)",
+              "instant": false
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Error rate",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 4,
+            "w": 4,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 0.01
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.05
+                  }
+                ]
+              },
+              "decimals": 2
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(sum(rate(traces_spanmetrics_calls_total{service=~\"shop-(web|orders|payments|receipts)\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name=~\"(GET|POST) /.*|.* process\", span_name!~\"GET /(healthz|livez)\", status_code=\"STATUS_CODE_ERROR\"}[5m])) or vector(0)) / sum(rate(traces_spanmetrics_calls_total{service=~\"shop-(web|orders|payments|receipts)\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name=~\"(GET|POST) /.*|.* process\", span_name!~\"GET /(healthz|livez)\"}[5m]))",
+              "instant": false
+            }
+          ],
+          "description": "Share of requests and Kafka messages that ended in an error, over 5 minutes. The canary analysis aborts a release above 5%."
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "title": "Checkout p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 4,
+            "w": 4,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1.5
+                  },
+                  {
+                    "color": "red",
+                    "value": 3
+                  }
+                ]
+              },
+              "decimals": 2
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(traces_spanmetrics_latency_bucket{service=\"shop-web\", span_kind=\"SPAN_KIND_SERVER\", span_name=\"POST /\"}[30m])))",
+              "instant": false
+            }
+          ],
+          "description": "Time to place an order (the product form posting to the web app), 95th percentile over 30 minutes."
+        },
+        {
+          "id": 7,
+          "type": "stat",
+          "title": "Kafka consumer lag",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 4,
+            "w": 4,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 10
+                  },
+                  {
+                    "color": "red",
+                    "value": 100
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(kafka_consumergroup_lag{topic=~\"order.paid|receipt.ready\"}) or vector(0)",
+              "instant": false
+            }
+          ],
+          "description": "Messages published but not yet processed, across both consumer groups."
+        },
+        {
+          "id": 8,
+          "type": "stat",
+          "title": "Messages in the DLQ",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 20,
+            "y": 4,
+            "w": 4,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              },
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(kafka_topic_partition_current_offset{topic=\"order.paid.dlq\"}) - sum(kafka_topic_partition_oldest_offset{topic=\"order.paid.dlq\"})",
+              "instant": false
+            }
+          ],
+          "description": "order.paid events the receipts worker gave up on after its retries (still retained in order.paid.dlq)."
+        },
+        {
+          "id": 9,
+          "type": "row",
+          "title": "Rate, errors, duration - per service",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "Requests / s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 9,
+            "w": 8,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": false
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (service) (rate(traces_spanmetrics_calls_total{service=~\"shop-(web|orders|payments|receipts)\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name=~\"(GET|POST) /.*|.* process\", span_name!~\"GET /(healthz|livez)\"}[$__rate_interval]))",
+              "legendFormat": "{{service}}"
+            }
+          ],
+          "description": "Routed HTTP requests (health checks excluded) and Kafka messages processed."
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "Errors / s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 9,
+            "w": 8,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": false
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (service) (rate(traces_spanmetrics_calls_total{service=~\"shop-(web|orders|payments|receipts)\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name=~\"(GET|POST) /.*|.* process\", span_name!~\"GET /(healthz|livez)\", status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval]))",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "type": "timeseries",
+          "title": "p95 duration",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 9,
+            "w": 8,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": false
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum by (le, service) (rate(traces_spanmetrics_latency_bucket{service=~\"shop-(web|orders|payments|receipts)\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name=~\"(GET|POST) /.*|.* process\", span_name!~\"GET /(healthz|livez)\"}[$__rate_interval])))",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "type": "nodeGraph",
+          "title": "Who calls whom",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "description": "Tempo's service graph: built from the traces, not from configuration.",
+          "gridPos": {
+            "x": 0,
+            "y": 17,
+            "w": 10,
+            "h": 10
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "tempo",
+                "uid": "tempo"
+              },
+              "queryType": "serviceMap",
+              "serviceMapQuery": "{client=~\"user|shop-.+\", server=~\"shop-.+\"}"
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "type": "table",
+          "title": "Endpoints and consumers (last 15 minutes)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 10,
+            "y": 17,
+            "w": 14,
+            "h": 10
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (service, span_name) (rate(traces_spanmetrics_calls_total{service=~\"shop-(web|orders|payments|receipts)\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name=~\"(GET|POST) /.*|.* process\", span_name!~\"GET /(healthz|livez)\"}[15m]))",
+              "instant": true,
+              "format": "table"
+            },
+            {
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(sum by (service, span_name) (rate(traces_spanmetrics_calls_total{service=~\"shop-(web|orders|payments|receipts)\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name=~\"(GET|POST) /.*|.* process\", span_name!~\"GET /(healthz|livez)\", status_code=\"STATUS_CODE_ERROR\"}[15m])) / sum by (service, span_name) (rate(traces_spanmetrics_calls_total{service=~\"shop-(web|orders|payments|receipts)\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name=~\"(GET|POST) /.*|.* process\", span_name!~\"GET /(healthz|livez)\"}[15m]))) or (sum by (service, span_name) (rate(traces_spanmetrics_calls_total{service=~\"shop-(web|orders|payments|receipts)\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name=~\"(GET|POST) /.*|.* process\", span_name!~\"GET /(healthz|livez)\"}[15m])) * 0)",
+              "instant": true,
+              "format": "table"
+            },
+            {
+              "refId": "C",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum by (le, service, span_name) (rate(traces_spanmetrics_latency_bucket{service=~\"shop-(web|orders|payments|receipts)\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name=~\"(GET|POST) /.*|.* process\", span_name!~\"GET /(healthz|livez)\"}[15m])))",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "service": "Service",
+                  "span_name": "Endpoint",
+                  "Value #A": "Per second",
+                  "Value #B": "Errors",
+                  "Value #C": "p95"
+                }
+              }
+            },
+            {
+              "id": "sortBy",
+              "options": {
+                "sort": [
+                  {
+                    "field": "Per second",
+                    "desc": true
+                  }
+                ]
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Per second"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "reqps"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Errors"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "red",
+                          "value": 0.05
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "p95"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 3
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm"
+          }
+        },
+        {
+          "id": 15,
+          "type": "row",
+          "title": "Kafka",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 27,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 16,
+          "type": "timeseries",
+          "title": "Consumer lag",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 28,
+            "w": 8,
+            "h": 7
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": false
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (consumergroup, topic) (kafka_consumergroup_lag{topic=~\"order.paid|receipt.ready\"})",
+              "legendFormat": "{{consumergroup}} \u2190 {{topic}}"
+            }
+          ],
+          "description": "receipts reads order.paid (it writes the PDF), orders reads receipt.ready (it marks the order's receipt as ready)."
+        },
+        {
+          "id": 17,
+          "type": "timeseries",
+          "title": "Messages published / s",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 28,
+            "w": 8,
+            "h": 7
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": false
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (topic) (rate(kafka_topic_partition_current_offset{topic=~\"order.paid|order.paid.dlq|receipt.ready\"}[$__rate_interval]))",
+              "legendFormat": "{{topic}}"
+            }
+          ]
+        },
+        {
+          "id": 18,
+          "type": "timeseries",
+          "title": "Consumers in each group",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 28,
+            "w": 8,
+            "h": 7
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": false
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (consumergroup) (kafka_consumergroup_members{consumergroup=~\"orders|receipts\"})",
+              "legendFormat": "{{consumergroup}}"
+            }
+          ],
+          "description": "Two replicas each: when chaos kills one, the group rebalances onto the survivor until the new pod joins."
+        },
+        {
+          "id": 19,
+          "type": "row",
+          "title": "Resilience",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 35,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 20,
+          "type": "timeseries",
+          "title": "Ready replicas",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 36,
+            "w": 12,
+            "h": 7
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": false
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (app) (label_replace(kube_pod_status_ready{namespace=\"portfolio\", pod=~\"shop-(web|orders|payments|receipts)-.+\", condition=\"true\"}, \"app\", \"$1\", \"pod\", \"(shop-[a-z]+)-.*\"))",
+              "legendFormat": "{{app}}"
+            }
+          ],
+          "description": "Two of each, one per node. A chaos kill takes one away for a few seconds; the other keeps serving."
+        },
+        {
+          "id": 21,
+          "type": "timeseries",
+          "title": "Pod restarts and replacements",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 36,
+            "w": 12,
+            "h": 7
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "mode": "normal",
+                  "group": "A"
+                }
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (app) (label_replace(changes(kube_pod_container_status_restarts_total{namespace=\"portfolio\", pod=~\"shop-(web|orders|payments|receipts)-.+\"}[$__rate_interval]), \"app\", \"$1\", \"pod\", \"(shop-[a-z]+)-.*\"))",
+              "legendFormat": "restarts {{app}}"
+            },
+            {
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "count by (app) (label_replace(kube_pod_created{namespace=\"portfolio\", pod=~\"shop-(web|orders|payments|receipts)-.+\"} unless kube_pod_created{namespace=\"portfolio\", pod=~\"shop-(web|orders|payments|receipts)-.+\"} offset $__rate_interval, \"app\", \"$1\", \"pod\", \"(shop-[a-z]+)-.*\"))",
+              "legendFormat": "new pod {{app}}"
+            }
+          ],
+          "description": "A container restarting in place (crash, failed liveness probe) vs. a new pod replacing a killed or rolled-out one."
+        },
+        {
+          "id": 22,
+          "type": "row",
+          "title": "Your purchases",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 43,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 23,
+          "type": "table",
+          "title": "Traces for user \"$user\"",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "description": "Every trace with a span tagged enduser.id = $user. Open one to follow a purchase through web \u2192 orders \u2192 payments \u2192 Kafka \u2192 receipts.",
+          "gridPos": {
+            "x": 0,
+            "y": 44,
+            "w": 24,
+            "h": 9
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "tempo",
+                "uid": "tempo"
+              },
+              "queryType": "traceql",
+              "limit": 50,
+              "tableType": "traces",
+              "query": "{ span.enduser.id = \"$user\" }"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm"
+          }
+        },
+        {
+          "id": 24,
+          "type": "logs",
+          "title": "Logs for user \"$user\"",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 53,
+            "w": 24,
+            "h": 10
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "expr": "{service_name=~\"shop-.+\"} | enduser_id = \"$user\""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "wrapLogMessage": true,
+            "sortOrder": "Descending",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "dedupStrategy": "none"
+          }
+        }
+      ]
+    }

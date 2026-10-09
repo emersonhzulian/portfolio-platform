@@ -65,6 +65,13 @@ spec:
                 name: k8s.pod.ip
           - sources:
               - from: connection
+      # Next.js names its fetch spans after the whole URL ("fetch GET http://shop-orders/orders/
+      # <uuid>"), and Tempo's span metrics make one series per span name - one per order. Ids
+      # become {id}, so the names stay a small, fixed set.
+      transform/span-names:
+        error_mode: ignore
+        trace_statements:
+          - replace_pattern(span.name, "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", "{id}")
       batch: {}
     exporters:
       otlphttp/loki:
@@ -82,5 +89,5 @@ spec:
           exporters: [otlphttp/loki]
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, batch]
+          processors: [memory_limiter, k8sattributes, transform/span-names, batch]
           exporters: [otlp/tempo]

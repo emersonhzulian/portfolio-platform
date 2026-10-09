@@ -13,4 +13,7 @@ export function traceSearchUrl(traceql: string, from = "now-1h"): string {
 }
 
 export const orderTraceUrl = (orderId: string) => traceSearchUrl(`{ span.order.id = "${orderId}" }`, "now-6h");
-export const userTraceUrl = (username: string) => traceSearchUrl(`{ span.enduser.id = "${username.replaceAll('"', "")}" }`, "now-24h");
+// The shop dashboard, its `user` variable set: the visitor's traces and logs, next to the
+// service-level panels they took part in.
+export const userDashboardUrl = (username: string) =>
+  `${config.grafanaUrl}/d/portfolio-shop?var-user=${encodeURIComponent(username)}&from=now-24h&to=now`;

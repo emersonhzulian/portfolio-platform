@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { userTraceUrl } from "@/lib/grafana";
+import { userDashboardUrl } from "@/lib/grafana";
 import { listOrders } from "@/lib/orders";
 import { tagUser } from "@/lib/telemetry";
 
@@ -20,7 +20,7 @@ export default async function MyOrders() {
       <h1>My orders</h1>
       <p className="muted">
         Everything you did here is in the traces, tagged with your username.{" "}
-        <a href={userTraceUrl(session.username)} target="_blank" rel="noreferrer">See all of it in Grafana →</a>
+        <a href={userDashboardUrl(session.username)} target="_blank" rel="noreferrer">See all of it in Grafana →</a>
       </p>
       {orders.length === 0 ? (
         <p>No orders yet. <Link href="/">Buy something</Link>.</p>
