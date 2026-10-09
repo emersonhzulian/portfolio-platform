@@ -1,6 +1,7 @@
 ---
 # The platform under the portfolio: Argo CD sync/health, the Flux hand-off and its Git
-# revision, the TLS certificate and the edge gateway - from the central Prometheus through a
+# revision, the TLS certificate, the edge gateway and the Kyverno policies (../../platform/
+# policies) - from the central Prometheus through a
 # federation allowlist (../prometheus/servicemonitor-platform.yaml). Anonymous visitors see
 # it at /d/portfolio-platform.
 # yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/grafana.integreatly.org/grafanadashboard_v1beta1.json
@@ -42,7 +43,7 @@ spec:
           },
           "options": {
             "mode": "markdown",
-            "content": "**The platform under the portfolio**, read from the cluster's own monitoring: Argo CD sync and health of every app, the Flux Kustomization that installs them (and the Git revision it applied), the TLS certificate, and the edge gateway. Only these series are shared with this Grafana (a federation allowlist), so it shows the machinery without exposing the rest of the homelab."
+            "content": "**The platform under the portfolio**, read from the cluster's own monitoring: Argo CD sync and health of every app, the Flux Kustomization that installs them (and the Git revision it applied), the TLS certificate, the edge gateway, and the Kyverno policies that place and check every pod. Only these series are shared with this Grafana (a federation allowlist), so it shows the machinery without exposing the rest of the homelab."
           }
         },
         {
@@ -516,6 +517,416 @@ spec:
             }
           ],
           "description": "Dips show syncs in progress or apps degrading - and recovering on their own."
+        },
+        {
+          "id": 10,
+          "type": "row",
+          "title": "Policy as code (Kyverno)",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 32,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 11,
+          "type": "stat",
+          "title": "Pods placed on the pool (24h)",
+          "description": "Pods the node-pool policy mutated on admission: each one got the pool's nodeSelector without its manifest saying so.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 33,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(increase(kyverno_mutating_policy_results_total{policy_name=\"node-pool\", execution_cause=\"admission_request\", result=\"pass\"}[24h])) or vector(0)"
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "type": "stat",
+          "title": "Requests refused (24h)",
+          "description": "Creates and updates a Deny policy refused - a manifest that broke a rule never reached the cluster.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 6,
+            "y": 33,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(increase(kyverno_validating_policy_results_total{execution_cause=\"admission_request\", policy_validation_mode=\"Deny\", result=\"fail\"}[24h])) or vector(0)"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "type": "stat",
+          "title": "Violations in the last scan",
+          "description": "Running resources the background scan found breaking a rule, over the last hour. Every rule denies now, so this should stay at 0.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 33,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(increase(kyverno_validating_policy_results_total{execution_cause=\"background_scan\", result=\"fail\"}[1h])) or vector(0)"
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "type": "stat",
+          "title": "Policy evaluations (24h)",
+          "description": "Every time a policy ran, on admission or in a background scan.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 18,
+            "y": 33,
+            "w": 6,
+            "h": 4
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(increase(kyverno_validating_policy_results_total[24h])) + sum(increase(kyverno_mutating_policy_results_total[24h]))"
+            }
+          ]
+        },
+        {
+          "id": 15,
+          "type": "table",
+          "title": "Rules, last hour",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Each rule's results over the last hour, on admission and in background scans. Mode is what the rule does with a failure: Deny refuses it, Audit only reports it.",
+          "gridPos": {
+            "x": 0,
+            "y": 37,
+            "w": 10,
+            "h": 8
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "format": "table",
+              "instant": true,
+              "expr": "sum by (policy_name, policy_validation_mode, result) (increase(kyverno_validating_policy_results_total[1h])) > 0"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "groupingToMatrix",
+              "options": {
+                "columnField": "result",
+                "rowField": "policy_name",
+                "valueField": "Value",
+                "emptyValue": "zero"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "renameByName": {
+                  "policy_name\\result": "Rule",
+                  "pass": "Pass",
+                  "fail": "Fail"
+                },
+                "indexByName": {
+                  "policy_name\\result": 0,
+                  "pass": 1,
+                  "fail": 2
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "decimals": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Fail"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "red",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm"
+          }
+        },
+        {
+          "id": 16,
+          "type": "timeseries",
+          "title": "Admission decisions",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "What the policies decided as Argo CD and the controllers created and updated resources. The node-pool line is the mutation; the rest are validations.",
+          "gridPos": {
+            "x": 10,
+            "y": 37,
+            "w": 14,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "drawStyle": "bars",
+                "stacking": {
+                  "mode": "normal",
+                  "group": "A"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "legendFormat": "{{result}}",
+              "interval": "5m",
+              "expr": "sum by (result) (increase(kyverno_validating_policy_results_total{execution_cause=\"admission_request\"}[$__interval]))"
+            },
+            {
+              "refId": "B",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "legendFormat": "node-pool mutation",
+              "interval": "5m",
+              "expr": "sum(increase(kyverno_mutating_policy_results_total{execution_cause=\"admission_request\"}[$__interval]))"
+            }
+          ]
         }
       ]
     }

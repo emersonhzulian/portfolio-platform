@@ -1,8 +1,8 @@
 ---
 # The platform underneath this namespace, as seen by the cluster's central Prometheus:
 # Argo CD sync/health of every portfolio app, the Flux Kustomization that installs them, the
-# TLS certificate, and the portfolio gateway's Envoy (requests by status class, rate-limit
-# hits). Pulled through /federate with an allowlist - only the series named in `match[]`
+# TLS certificate, the portfolio gateway's Envoy (requests by status class, rate-limit
+# hits) and the Kyverno policies' results. Pulled through /federate with an allowlist - only the series named in `match[]`
 # cross over, each one already scoped to the portfolio - so the public Grafana can show the
 # machinery without seeing the rest of the homelab. Dashboard: ../grafana/dashboard-platform.yaml.
 apiVersion: monitoring.coreos.com/v1
@@ -34,7 +34,10 @@ spec:
           # Global (Redis-backed) rate limit decisions, per upstream cluster.
           - 'envoy_cluster_ratelimit_ok{gateway="portfolio",gateway_namespace="portfolio"}'
           - 'envoy_cluster_ratelimit_over_limit{gateway="portfolio",gateway_namespace="portfolio"}'
-          - 'kyverno_policy_results_total{resource_namespace="portfolio"}'
+          # Kyverno's CEL policies (ValidatingPolicy/MutatingPolicy) have their own counters;
+          # kyverno_policy_results_total is the older ClusterPolicy one.
+          - 'kyverno_validating_policy_results_total{policy_namespace="portfolio"}'
+          - 'kyverno_mutating_policy_results_total{policy_namespace="portfolio"}'
       # The synthetic up/scrape_* series: no pod IP, no observability namespace.
       relabelings:
         - targetLabel: instance
