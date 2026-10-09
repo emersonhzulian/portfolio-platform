@@ -32,13 +32,14 @@ jobs:
             web: ["shop/web/**"]
             orders: ["shop/orders/**"]
             payments: ["shop/payments/**"]
+            receipts: ["shop/receipts/**"]
             workflow: [".github/workflows/shop.yml"]
       - id: pick
         env:
           CHANGED: ${{ steps.filter.outputs.changes }}
           REQUESTED: ${{ inputs.service }}
         run: |
-          all='["web","orders","payments"]'
+          all='["web","orders","payments","receipts"]'
           if [ -n "$REQUESTED" ]; then echo "services=[\"$REQUESTED\"]" >> "$GITHUB_OUTPUT"
           elif [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] || echo "$CHANGED" | grep -q workflow; then echo "services=$all" >> "$GITHUB_OUTPUT"
           else echo "services=$(echo "$CHANGED" | jq -c '[.[] | select(. != "workflow")]')" >> "$GITHUB_OUTPUT"; fi

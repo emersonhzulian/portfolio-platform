@@ -20,6 +20,7 @@ builder.Services.AddHttpClient("payments", c =>
     c.Timeout = TimeSpan.FromSeconds(10);
 });
 builder.Services.AddHostedService<OutboxPublisher>();
+builder.Services.AddHostedService<ReceiptEvents>();
 builder.Services.AddSingleton<FaultInjection>();
 
 // Tokens are issued by authentik for the public URL (Auth:Issuer); signing keys are fetched

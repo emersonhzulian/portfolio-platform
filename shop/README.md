@@ -8,6 +8,7 @@ trace that covers all of it in Grafana. Live at https://shop.emersonzulian.dev.
 |---|---|---|
 | `web/` | Node.js, Next.js 16 | Storefront + backend-for-frontend. OIDC login against authentik (code + PKCE, `openid-client`); sessions in Redis, so the browser only holds a random id; per-user rate limits in Redis |
 | `orders/` | .NET 10, EF Core, PostgreSQL | Catalog and orders. Validates the visitor's access token itself; receives the payment webhook (HMAC-signed, idempotent); writes `order.paid` to a transactional outbox and publishes it to Kafka as a CloudEvent |
+| `receipts/` | Node.js, `@confluentinc/kafka-javascript`, PDFKit | Consumes `order.paid`, writes the PDF receipt into the visitor's folder (downloaded through FileBrowser), publishes `receipt.ready`. Idempotent (the file is named after the order), retries then parks failures in `order.paid.dlq`. Carries the trace context across Kafka by hand (W3C headers): the agent doesn't instrument this client |
 | `payments/` | .NET 10, EF Core, PostgreSQL | A simulated Pix provider: records a charge, approves it after a delay and calls the merchant's webhook. Safe with any number of replicas (`FOR UPDATE SKIP LOCKED`) |
 
 Every service is auto-instrumented by the OpenTelemetry Operator (no SDK setup in the code). The

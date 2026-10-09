@@ -9,7 +9,10 @@ const STEPS: { type: string; label: string }[] = [
   { type: "payment-requested", label: "Pix charge created (orders → payments)" },
   { type: "paid", label: "Payment confirmed (payments → orders webhook)" },
   { type: "event-published", label: "order.paid published to Kafka (outbox)" },
+  { type: "receipt-ready", label: "Receipt written (Kafka → receipts → receipt.ready)" },
 ];
+
+const FILES_URL = "https://files.emersonzulian.dev";
 
 export function Timeline({ initial }: { initial: Order }) {
   const [order, setOrder] = useState(initial);
@@ -37,6 +40,12 @@ export function Timeline({ initial }: { initial: Order }) {
             <span className="muted">
               {event ? `${new Date(event.at).toLocaleTimeString("en-GB")} · ${event.detail}` : "waiting…"}
             </span>
+            {event && step.type === "receipt-ready" && (
+              <>
+                {" "}
+                <a href={FILES_URL} target="_blank" rel="noreferrer">Download it from FileBrowser →</a>
+              </>
+            )}
           </li>
         );
       })}
