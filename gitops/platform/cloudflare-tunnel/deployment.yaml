@@ -17,6 +17,7 @@ spec:
     metadata:
       labels:
         app: cloudflare-tunnel
+        app.kubernetes.io/name: cloudflared
     spec:
       topologySpreadConstraints:
         - maxSkew: 1

@@ -16,6 +16,7 @@ spec:
     metadata:
       labels:
         app: external-dns
+        app.kubernetes.io/name: external-dns
     spec:
       serviceAccountName: external-dns
       containers:

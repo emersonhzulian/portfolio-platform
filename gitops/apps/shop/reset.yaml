@@ -26,6 +26,8 @@ spec:
         metadata:
           labels:
             app: shop-reset
+            app.kubernetes.io/name: shop-reset
+            app.kubernetes.io/part-of: portfolio-shop
         spec:
           restartPolicy: Never
           automountServiceAccountToken: false

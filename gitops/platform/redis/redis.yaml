@@ -21,6 +21,7 @@ spec:
     metadata:
       labels:
         app: redis
+        app.kubernetes.io/name: redis
     spec:
       automountServiceAccountToken: false
       securityContext:

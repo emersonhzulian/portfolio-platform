@@ -19,6 +19,7 @@ spec:
     metadata:
       labels:
         app: gatus
+        app.kubernetes.io/name: gatus
     spec:
       automountServiceAccountToken: false
       securityContext:

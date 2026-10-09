@@ -17,6 +17,7 @@ spec:
     metadata:
       labels:
         app: landing
+        app.kubernetes.io/name: landing
     spec:
       topologySpreadConstraints:
         - maxSkew: 1
