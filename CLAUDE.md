@@ -24,7 +24,9 @@ namespace of my homelab cluster; `shop/` is the source of the app that runs on i
   new mutating policy with a probe policy first - a failing patch with `failurePolicy: Fail`
   denies every pod.
 - **Replicas:** spread with `topologySpreadConstraints` on `kubernetes.io/hostname` plus
-  `matchLabelKeys: [pod-template-hash]`. Size requests from measured use, not from the limit.
+  `matchLabelKeys: [pod-template-hash]` (`rollouts-pod-template-hash` for a Rollout, which also
+  needs `OTEL_SERVICE_NAME` pinned - the operator would name it after the ReplicaSet). Size
+  requests from measured use, not from the limit.
 - **ServiceMonitors/PodMonitors** carry `prometheus.homelab/instance: portfolio` (the cluster's
   central Prometheus skips them).
 - **Before pushing:** `kubectl kustomize` every changed folder from a clean checkout (an

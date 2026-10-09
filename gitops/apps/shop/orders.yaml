@@ -60,6 +60,10 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            # Set explicitly: the OpenTelemetry Operator names a service after the pod's owner,
+            # and for a Rollout that's the ReplicaSet (shop-orders-<hash>), a new name each release.
+            - name: OTEL_SERVICE_NAME
+              value: shop-orders
             - name: DB_USER
               valueFrom:
                 secretKeyRef: {name: shop-db-app, key: username}
