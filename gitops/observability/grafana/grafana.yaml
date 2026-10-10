@@ -5,7 +5,7 @@
 #   - the datasources only hold this namespace's data (separate Prometheus/Loki/Tempo);
 #   - each backend caps what one query may cost (timeouts, series/sample/line limits);
 #   - the gateway rate-limits queries per visitor and 404s logins and raw backend APIs
-#     (httproute.yaml, ../../platform/gateway/trafficpolicies.yaml);
+#     (httproute.yaml, ../../platform/gateway/backendtrafficpolicy.yaml);
 #   - a CiliumNetworkPolicy confines this pod to its datasources.
 # The admin login is only reachable through routes the hosting cluster adds on its private
 # network.

@@ -1,0 +1,22 @@
+---
+# Visitors arrive through the Cloudflare tunnel, so Envoy only sees cloudflared's pod IP.
+# Cloudflare puts the visitor's address in CF-Connecting-IP; trusting it is safe here because
+# this gateway is ClusterIP-only and the tunnel is the only thing that reaches it. Without
+# this, every visitor would share one rate-limit bucket.
+#
+# Envoy Gateway allows exactly one ClientTrafficPolicy and one BackendTrafficPolicy per
+# Gateway (a second one is ignored as Conflicted): this file and backendtrafficpolicy.yaml hold every
+# setting.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: portfolio
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: portfolio
+  clientIPDetection:
+    customHeader:
+      name: CF-Connecting-IP
+      failClosed: false

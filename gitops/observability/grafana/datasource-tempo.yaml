@@ -1,0 +1,35 @@
+---
+# Every datasource points at this namespace's own backends, which only hold portfolio data -
+# visitors can query them freely in Explore, but never reach anything else. Fixed uids so
+# they can link to each other.
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/grafana.integreatly.org/grafanadatasource_v1beta1.json
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: tempo
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  # See dashboard.yaml: re-populate within a minute after a Grafana restart.
+  resyncPeriod: 1m
+  uid: tempo
+  instanceSelector:
+    matchLabels:
+      grafana.internal/instance: portfolio
+  datasource:
+    type: tempo
+    name: tempo
+    access: proxy
+    url: http://tempo.portfolio.svc.cluster.local:3200
+    jsonData:
+      timeout: 30
+      nodeGraph:
+        enabled: true
+      serviceMap:
+        datasourceUid: prometheus
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        filterByTraceID: true
+        customQuery: false

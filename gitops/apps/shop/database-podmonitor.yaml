@@ -1,0 +1,14 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: shop-db
+  labels:
+    prometheus.homelab/instance: portfolio # skipped by the central Prometheus
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: shop-db
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s

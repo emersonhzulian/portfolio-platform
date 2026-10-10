@@ -1,0 +1,13 @@
+---
+# Emitted by the receipts service when a receipt is written; consumed by orders (timeline).
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: receipt.ready
+  labels:
+    strimzi.io/cluster: portfolio
+spec:
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: 604800000

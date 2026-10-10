@@ -1,0 +1,17 @@
+---
+# Prometheus scrapes cAdvisor on every kubelet (the control-plane node also carries the
+# kube-apiserver identity, hence all three).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: prometheus-kubelets
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  egress:
+    - toEntities: [host, remote-node, kube-apiserver]
+      toPorts:
+        - ports:
+            - port: "10250"
+              protocol: TCP

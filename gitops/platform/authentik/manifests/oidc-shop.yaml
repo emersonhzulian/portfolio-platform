@@ -1,0 +1,19 @@
+---
+# portfolio-shop (blueprints/shop.yaml); also read by the shop's web app.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: shop-oidc
+spec:
+  refreshPolicy: CreatedOnce
+  target:
+    name: shop-oidc
+    template:
+      data:
+        SHOP_OIDC_CLIENT_SECRET: "{{ .password }}"
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: authentik-client-secret

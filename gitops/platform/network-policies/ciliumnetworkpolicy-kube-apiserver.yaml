@@ -1,0 +1,82 @@
+---
+# The API server, by its Cilium identity: an ipBlock would neither match it nor belong in a
+# public repository.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: kube-apiserver
+specs:
+  # Prometheus: service discovery.
+  - endpointSelector:
+      matchLabels:
+        app.kubernetes.io/name: prometheus
+    egress:
+      - toEntities: [kube-apiserver]
+        toPorts:
+          - ports:
+              - port: "6443"
+                protocol: TCP
+  # Loki's rules sidecar watches ConfigMaps.
+  - endpointSelector:
+      matchLabels:
+        app.kubernetes.io/name: loki
+    egress:
+      - toEntities: [kube-apiserver]
+        toPorts:
+          - ports:
+              - port: "6443"
+                protocol: TCP
+  # The OTLP collector's k8sattributes processor looks pods up.
+  - endpointSelector:
+      matchLabels:
+        app.kubernetes.io/component: opentelemetry-collector
+    egress:
+      - toEntities: [kube-apiserver]
+        toPorts:
+          - ports:
+              - port: "6443"
+                protocol: TCP
+  # external-dns reads HTTPRoutes.
+  - endpointSelector:
+      matchLabels:
+        app: external-dns
+    egress:
+      - toEntities: [kube-apiserver]
+        toPorts:
+          - ports:
+              - port: "6443"
+                protocol: TCP
+  # CloudNativePG instance managers report status on their Cluster object.
+  - endpointSelector:
+      matchExpressions:
+        - key: cnpg.io/cluster
+          operator: Exists
+    egress:
+      - toEntities: [kube-apiserver]
+        toPorts:
+          - ports:
+              - port: "6443"
+                protocol: TCP
+  # Kafka brokers read their own config Secret through the API (Strimzi's
+  # KubernetesSecretConfigProvider) before they start.
+  - endpointSelector:
+      matchLabels:
+        strimzi.io/name: portfolio-kafka
+    egress:
+      - toEntities: [kube-apiserver]
+        toPorts:
+          - ports:
+              - port: "6443"
+                protocol: TCP
+  # Strimzi's topic operator turns KafkaTopic objects into topics.
+  - endpointSelector:
+      matchLabels:
+        strimzi.io/name: portfolio-entity-operator
+    egress:
+      - toEntities: [kube-apiserver]
+        toPorts:
+          - ports:
+              - port: "6443"
+                protocol: TCP
+
+# 3. ---------------------------------------------------------------------------------------

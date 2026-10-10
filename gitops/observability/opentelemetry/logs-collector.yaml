@@ -67,7 +67,7 @@ spec:
         limit_percentage: 75
         spike_limit_percentage: 20
       # Namespaced to portfolio; the Role/RoleBinding for this ServiceAccount live in
-      # rbac.yaml (they have to be created in the portfolio namespace).
+      # role.yaml/rolebinding.yaml (they have to be created in the portfolio namespace).
       k8sattributes:
         auth_type: serviceAccount
         passthrough: false

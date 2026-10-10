@@ -1,0 +1,74 @@
+---
+# Outbound by hostname, part 2: what each app may reach, by name (the names are learnt through
+# the DNS proxy, ciliumnetworkpolicy-dns-proxy.yaml - an app listed here must be there too).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: egress-by-hostname
+specs:
+  # cloudflared: tunnel control plane and API calls.
+  - endpointSelector:
+      matchLabels:
+        app: cloudflare-tunnel
+    egress:
+      - toFQDNs:
+          - matchPattern: "*.argotunnel.com"
+          - matchPattern: "*.cloudflare.com"
+          - matchName: "cloudflare.com"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
+  # external-dns writes records through Cloudflare's API.
+  - endpointSelector:
+      matchLabels:
+        app: external-dns
+    egress:
+      - toFQDNs:
+          - matchName: "api.cloudflare.com"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
+  # authentik's server verifies sign-up captchas with Cloudflare Turnstile.
+  - endpointSelector:
+      matchLabels:
+        app.kubernetes.io/name: authentik
+        app.kubernetes.io/component: server
+    egress:
+      - toFQDNs:
+          - matchName: "challenges.cloudflare.com"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
+  # The shop's web app talks OIDC to authentik on its public URL (discovery, code exchange):
+  # authentik derives a token's issuer from the request's host, so the in-cluster address
+  # would mint tokens nothing else accepts.
+  - endpointSelector:
+      matchLabels:
+        app: shop-web
+    egress:
+      - toFQDNs:
+          - matchName: "auth.emersonzulian.dev"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
+  # The synthetic shopper and Gatus reach the public endpoints the way a visitor does: out to
+  # Cloudflare and back in through the tunnel and the gateway.
+  - endpointSelector:
+      matchExpressions:
+        - key: app
+          operator: In
+          values: [gatus, synthetic-shopper]
+    egress:
+      - toFQDNs:
+          - matchName: "emersonzulian.dev"
+          - matchPattern: "*.emersonzulian.dev"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
+
+# 2. ---------------------------------------------------------------------------------------

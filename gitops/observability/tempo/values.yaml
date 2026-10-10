@@ -1,7 +1,7 @@
 ---
 # Portfolio copy of the cluster's Tempo setup; only ever holds traces from the portfolio
 # namespace.
-# Helm values for the tempo chart (source and version: ../apps/tempo.yaml).
+# Helm values for the tempo chart (source and version: ../../argocd/observability/tempo.yaml).
 tempo:
   # Same window as Loki, so a trace's logs are always still there.
   retention: 168h

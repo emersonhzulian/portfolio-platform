@@ -2,6 +2,47 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# Namespace lockdown, both directions. This namespace is the one part of the cluster that the
+# internet reaches, so its boundary is default-deny (networkpolicy-default-deny.yaml): anything
+# crossing it - in or out - is listed, and a new pod dropped in here gets nothing beyond DNS and
+# its neighbours. One policy per file; they only ever add allows to the default-deny.
+#
+# The model:
+#   - Inside the namespace, pods talk freely (apps -> collector -> Loki/Tempo -> Prometheus).
+#     The namespace is the trust boundary (networkpolicy-same-namespace.yaml).
+#   - Grafana and the Kafka UI are exceptions: both are public tools visitors drive, so each
+#     keeps its own, narrower policy (Grafana: ../../observability/grafana/networkpolicy.yaml,
+#     Kafka UI: networkpolicy-kafka-ui.yaml) and is left out of `same-namespace`. FileBrowser
+#     too (networkpolicy-filebrowser.yaml): it trusts the X-Auth-User header the gateway sets,
+#     so nothing but the gateway may reach it. Policies only ever add allows, so selecting them
+#     there would widen what they can reach.
+#
+# Plain Kubernetes NetworkPolicy (networkpolicy-*.yaml) wherever it can say it. Cilium's own
+# policy (ciliumnetworkpolicy-*.yaml) only for what NetworkPolicy can't express:
+#   1. Outbound by hostname (toFQDNs). NetworkPolicy only knows IP blocks, and Cloudflare's
+#      addresses change under us; the native alternative would be "any address on 443".
+#   2. The API server. Cilium gives it its own identity (`kube-apiserver`), which an ipBlock
+#      doesn't match - and an ipBlock would mean node IPs in this public repository.
+#   3. The kubelets, for the same reason (identities `host` / `remote-node`).
+#
+# Kubelet probes come from the host and stay allowed (Cilium's default for host traffic).
+# Debug a dropped flow: `kubectl -n kube-system port-forward svc/hubble-relay 4245:80`, then
+# `hubble observe -n portfolio --verdict DROPPED`.
 resources:
-  - ./networkpolicy.yaml
-  - ./ciliumnetworkpolicy.yaml
+  - ./networkpolicy-default-deny.yaml
+  - ./networkpolicy-allow-dns.yaml
+  - ./networkpolicy-same-namespace.yaml
+  - ./networkpolicy-from-gateways.yaml
+  - ./networkpolicy-prometheus.yaml
+  - ./networkpolicy-loki.yaml
+  - ./networkpolicy-cloudflare-tunnel.yaml
+  - ./networkpolicy-redis.yaml
+  - ./networkpolicy-authentik.yaml
+  - ./networkpolicy-cloudnative-pg.yaml
+  - ./networkpolicy-shop-web.yaml
+  - ./networkpolicy-kafka-ui.yaml
+  - ./networkpolicy-filebrowser.yaml
+  - ./ciliumnetworkpolicy-dns-proxy.yaml
+  - ./ciliumnetworkpolicy-egress-by-hostname.yaml
+  - ./ciliumnetworkpolicy-kube-apiserver.yaml
+  - ./ciliumnetworkpolicy-prometheus-kubelets.yaml

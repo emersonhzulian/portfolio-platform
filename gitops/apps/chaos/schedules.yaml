@@ -6,8 +6,10 @@
 # minute) and the synthetic shopper (buying every few minutes) are the witnesses, and the
 # kill shows up in Argo CD as a fresh PodChaos under this schedule.
 #
-# The namespace opted in (annotation chaos-mesh.org/inject=enabled); Chaos Mesh can't touch
-# anything else in the cluster.
+# Only this namespace can be hit: Chaos Mesh is installed with enableFilterNamespace (in the
+# hosting cluster's repository), so its controller selects pods only in namespaces annotated
+# chaos-mesh.org/inject=enabled - and this is the only one (../../platform/namespace). A
+# selector pointing anywhere else ends in "no pod is selected".
 apiVersion: chaos-mesh.org/v1alpha1
 kind: Schedule
 metadata:

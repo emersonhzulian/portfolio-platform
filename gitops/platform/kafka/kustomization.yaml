@@ -3,7 +3,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  - ./kafkanodepool.yaml
   - ./kafka.yaml
-  - ./topics.yaml
+  - ./topic-order-paid.yaml
+  - ./topic-order-paid-dlq.yaml
+  - ./topic-receipt-ready.yaml
   - ./users.yaml
   - ./podmonitor.yaml

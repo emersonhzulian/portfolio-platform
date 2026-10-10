@@ -1,0 +1,34 @@
+---
+# The single KRaft node, both controller and broker (see kafka.yaml).
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: kafka
+  labels:
+    strimzi.io/cluster: portfolio
+spec:
+  replicas: 1
+  roles: [controller, broker]
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: 5Gi
+        # Block storage for the log segments; Delete class like the other portfolio volumes.
+        class: freenas-iscsi-csi
+        deleteClaim: true
+        kraftMetadata: shared
+  resources:
+    requests: {cpu: 100m, memory: 768Mi}
+    limits: {memory: 1Gi}
+  jvmOptions:
+    -Xms: 256m
+    -Xmx: 512m
+  template:
+    pod:
+      # Replaces Strimzi's default pod securityContext, so it has to carry its fsGroup too:
+      # the image runs as uid 1001 / gid 0, and the data volume must be group-writable.
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 0

@@ -1,0 +1,28 @@
+---
+apiVersion: policies.kyverno.io/v1
+kind: NamespacedValidatingPolicy
+metadata:
+  name: require-readiness-probe
+spec:
+  validationActions: [Deny]
+  evaluation:
+    background:
+      enabled: true
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  # A Job's pod runs to completion and serves nothing: there is no traffic to hold back.
+  matchConditions:
+    - name: not-a-job
+      expression: >-
+        !(has(object.metadata.ownerReferences) &&
+          object.metadata.ownerReferences.exists(r, r.kind == 'Job'))
+  validations:
+    - expression: "object.spec.containers.all(c, has(c.readinessProbe))"
+      message: Containers need a readiness probe, so traffic only reaches pods that are ready.

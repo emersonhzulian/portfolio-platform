@@ -26,7 +26,7 @@ global:
   envFrom:
     - secretRef:
         name: authentik-env
-    # SHOP_OIDC_CLIENT_SECRET (manifests/oidc-clients.yaml). Required: env is read at start,
+    # SHOP_OIDC_CLIENT_SECRET (manifests/oidc-client-secrets.yaml). Required: env is read at start,
     # so authentik waits for it rather than registering the shop with an empty secret.
     - secretRef:
         name: shop-oidc
@@ -82,7 +82,7 @@ server:
   metrics:
     enabled: true
     # The chart's ServiceMonitor can't carry the label that keeps the central Prometheus
-    # away; manifests/monitoring.yaml has one that does.
+    # away; manifests/servicemonitor.yaml has one that does.
     serviceMonitor:
       enabled: false
 

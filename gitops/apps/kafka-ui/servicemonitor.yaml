@@ -1,0 +1,15 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kafka-ui
+  labels:
+    prometheus.homelab/instance: portfolio # skipped by the central Prometheus
+spec:
+  selector:
+    matchLabels:
+      app: kafka-ui
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 60s

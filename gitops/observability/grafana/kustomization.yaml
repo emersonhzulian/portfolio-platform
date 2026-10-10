@@ -5,7 +5,9 @@ kind: Kustomization
 resources:
   - ./grafana.yaml
   - ./externalsecret.yaml
-  - ./datasources.yaml
+  - ./datasource-prometheus.yaml
+  - ./datasource-loki.yaml
+  - ./datasource-tempo.yaml
   - ./dashboard.yaml
   - ./dashboard-platform.yaml
   - ./dashboard-shop.yaml

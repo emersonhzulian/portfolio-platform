@@ -1,5 +1,5 @@
 # The portfolio shop as an OIDC client of authentik (shop/web). Its client secret is
-# generated in-cluster (gitops/apps/shop/secrets.yaml) and reaches authentik as
+# generated in-cluster (../oidc-client-secrets.yaml) and reaches authentik as
 # the env var SHOP_OIDC_CLIENT_SECRET.
 version: 1
 metadata:

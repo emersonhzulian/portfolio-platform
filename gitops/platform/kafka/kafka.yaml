@@ -8,43 +8,10 @@
 #     anonymous principal is a super user - the namespace's network policies are its boundary
 #     (and the Kafka UI is kept off it).
 #   - `scram` (9093, TLS): authenticated clients with their own ACLs. The public Kafka UI
-#     connects here as KafkaUser `kafka-ui` (kafka-ui.yaml), which may only read: even if the
+#     connects here as KafkaUser `kafka-ui` (users.yaml), which may only read: even if the
 #     UI's own read-only mode were bypassed, the broker refuses writes.
 # Strimzi adds its own NetworkPolicies on top so its operator (namespace strimzi) can reach
 # the broker's control ports, and makes its own components super users.
-apiVersion: kafka.strimzi.io/v1
-kind: KafkaNodePool
-metadata:
-  name: kafka
-  labels:
-    strimzi.io/cluster: portfolio
-spec:
-  replicas: 1
-  roles: [controller, broker]
-  storage:
-    type: jbod
-    volumes:
-      - id: 0
-        type: persistent-claim
-        size: 5Gi
-        # Block storage for the log segments; Delete class like the other portfolio volumes.
-        class: freenas-iscsi-csi
-        deleteClaim: true
-        kraftMetadata: shared
-  resources:
-    requests: {cpu: 100m, memory: 768Mi}
-    limits: {memory: 1Gi}
-  jvmOptions:
-    -Xms: 256m
-    -Xmx: 512m
-  template:
-    pod:
-      # Replaces Strimzi's default pod securityContext, so it has to carry its fsGroup too:
-      # the image runs as uid 1001 / gid 0, and the data volume must be group-writable.
-      securityContext:
-        runAsNonRoot: true
-        fsGroup: 0
----
 apiVersion: kafka.strimzi.io/v1
 kind: Kafka
 metadata:
@@ -75,7 +42,7 @@ spec:
       transaction.state.log.min.isr: 1
       default.replication.factor: 1
       min.insync.replicas: 1
-      # Topics are declared as KafkaTopic objects (topics.yaml), never created by a typo.
+      # Topics are declared as KafkaTopic objects (topic-*.yaml), never created by a typo.
       auto.create.topics.enable: false
       log.retention.hours: 168
     # Kafka's own metrics in Prometheus format, no JMX exporter config to maintain.

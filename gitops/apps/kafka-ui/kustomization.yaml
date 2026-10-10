@@ -3,7 +3,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ./kafka-ui.yaml
+  - ./deployment.yaml
+  - ./service.yaml
+  - ./servicemonitor.yaml
+  - ./httproute.yaml
+  - ./httproutefilter.yaml
 # Hashed name: a config change rolls the pod by itself.
 configMapGenerator:
   - name: kafka-ui-config

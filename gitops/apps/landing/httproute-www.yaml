@@ -1,0 +1,20 @@
+---
+# www.emersonzulian.dev redirects to the apex (httproute.yaml).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: landing-www
+  annotations:
+    external-dns.alpha.kubernetes.io/cloudflare: "true"
+spec:
+  parentRefs:
+    - name: portfolio
+      sectionName: https
+  hostnames:
+    - "www.emersonzulian.dev"
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            hostname: emersonzulian.dev
+            statusCode: 301

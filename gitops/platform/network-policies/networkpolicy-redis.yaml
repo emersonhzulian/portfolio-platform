@@ -1,0 +1,23 @@
+---
+# Redis also keeps the counters of the portfolio gateway's global rate limit, written by
+# Envoy Gateway's ratelimit service in envoy-gateway-system.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy-ratelimit
+      ports:
+        - port: 6379
+          protocol: TCP

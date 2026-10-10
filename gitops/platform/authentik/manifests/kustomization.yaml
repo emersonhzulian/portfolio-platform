@@ -4,11 +4,15 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ./externalsecret.yaml
-  - ./oidc-clients.yaml
+  - ./oidc-client-secrets.yaml
+  - ./oidc-shop.yaml
+  - ./oidc-files.yaml
   - ./bot-accounts.yaml
   - ./database.yaml
-  - ./monitoring.yaml
+  - ./servicemonitor.yaml
+  - ./podmonitor-db.yaml
   - ./httproute.yaml
+  - ./httproutefilter.yaml
 configMapGenerator:
   # The chart mounts it by this exact name (values.yaml, blueprints.configMaps); authentik
   # re-applies a blueprint when the mounted file changes, so no hash suffix is needed.

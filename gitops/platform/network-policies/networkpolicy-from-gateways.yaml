@@ -1,0 +1,27 @@
+---
+# The way in from the internet (Gateway/portfolio) and from the hosting cluster's private
+# gateway: both are Envoy Gateway proxies. Which hostnames and paths reach a pod is decided
+# by the HTTPRoutes; this only says which pods a proxy may reach at all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: from-gateways
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [landing, gatus]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+      ports:
+        - port: 8080
+          protocol: TCP

@@ -1,0 +1,68 @@
+---
+# Public, read-only view of the portfolio's Kafka at kafka.emersonzulian.dev: topics,
+# messages (order.paid events of the shop), consumer groups and their lag.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-ui
+  labels:
+    app: kafka-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-ui
+  template:
+    metadata:
+      labels:
+        app: kafka-ui
+        app.kubernetes.io/name: kafka-ui
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: kafka-ui
+          image: ghcr.io/kafbat/kafka-ui:v1.5.0
+          env:
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: /config/config.yaml
+            - name: KAFKA_SASL_JAAS_CONFIG
+              valueFrom:
+                secretKeyRef: {name: kafka-ui, key: sasl.jaas.config}
+            - name: JAVA_OPTS
+              value: -XX:MaxRAMPercentage=70 -Djava.io.tmpdir=/tmp
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: http}
+            initialDelaySeconds: 20
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            initialDelaySeconds: 60
+          resources:
+            requests: {cpu: 50m, memory: 384Mi}
+            limits: {memory: 640Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 100
+            runAsGroup: 101
+            capabilities: {drop: ["ALL"]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: config, mountPath: /config, readOnly: true}
+            - {name: kafka-ca, mountPath: /etc/kafka-ca, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap:
+            name: kafka-ui-config
+        # The cluster CA Strimzi signs the broker certificates with.
+        - name: kafka-ca
+          secret:
+            secretName: portfolio-cluster-ca-cert
+            items:
+              - {key: ca.crt, path: ca.crt}
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,27 @@
+---
+# Every pod says what it is with the recommended label, so dashboards, queries and policies can
+# group by app no matter who created the pod - a chart, an operator or a manifest here.
+apiVersion: policies.kyverno.io/v1
+kind: NamespacedValidatingPolicy
+metadata:
+  name: require-app-name-label
+spec:
+  validationActions: [Deny]
+  evaluation:
+    background:
+      enabled: true
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, daemonsets, jobs, cronjobs]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  validations:
+    - expression: >-
+        has(object.metadata.labels) &&
+        "app.kubernetes.io/name" in object.metadata.labels &&
+        object.metadata.labels["app.kubernetes.io/name"] != ""
+      message: "Label the pod with app.kubernetes.io/name."

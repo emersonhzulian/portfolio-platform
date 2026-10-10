@@ -1,0 +1,11 @@
+---
+# The `payments` database, owned by the managed role `payments` (database-cluster.yaml).
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: shop-db-payments
+spec:
+  cluster:
+    name: shop-db
+  name: payments
+  owner: payments

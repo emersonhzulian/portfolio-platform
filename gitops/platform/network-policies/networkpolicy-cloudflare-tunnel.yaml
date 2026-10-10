@@ -1,0 +1,36 @@
+---
+# cloudflared: outbound-only tunnel to Cloudflare's edge, then into the portfolio gateway.
+# (Its HTTPS calls to Cloudflare by hostname: ciliumnetworkpolicy-egress-by-hostname.yaml.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cloudflare-tunnel
+spec:
+  podSelector:
+    matchLabels:
+      app: cloudflare-tunnel
+  policyTypes: [Egress]
+  egress:
+    # Tunnel connections (QUIC, falling back to HTTP/2). The edge addresses come from SRV
+    # records and change, so this is by port: any public address, never a private one.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+      ports:
+        - port: 7844
+          protocol: UDP
+        - port: 7844
+          protocol: TCP
+    # The Envoy proxy behind Gateway/portfolio.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+      ports:
+        - port: 10443
+          protocol: TCP

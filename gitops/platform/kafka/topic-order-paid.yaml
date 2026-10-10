@@ -1,0 +1,13 @@
+---
+# Emitted by the orders service when a payment is confirmed; consumed by the receipts worker.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: order.paid
+  labels:
+    strimzi.io/cluster: portfolio
+spec:
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: 604800000 # 7 days

@@ -1,0 +1,83 @@
+---
+# Redis for the portfolio: the shop's sessions and per-user rate limits, and the counters of
+# the gateway's global rate limit (Envoy Gateway's ratelimit service, cluster-side). All of
+# it is short-lived by design - sessions and counters expire - so no persistence: a restart
+# logs visitors out and resets the counters, nothing else.
+#
+# No password: the only clients allowed to connect are listed in the namespace's network
+# policies (this namespace, plus Envoy Gateway's ratelimit service).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        app.kubernetes.io/name: redis
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: redis
+          image: redis:8.10.2-alpine
+          args:
+            - --save
+            - ""
+            - --appendonly
+            - "no"
+            - --maxmemory
+            - 96mb
+            # Evict only keys that have a TTL (sessions, rate-limit windows), never the rest.
+            - --maxmemory-policy
+            - volatile-lru
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec:
+              command: [redis-cli, ping]
+          livenessProbe:
+            tcpSocket:
+              port: redis
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 160Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+        - name: exporter
+          image: oliver006/redis_exporter:v1.93.0
+          ports:
+            - name: metrics
+              containerPort: 9121
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+          resources:
+            requests: {cpu: 5m, memory: 16Mi}
+            limits: {memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+      volumes:
+        - name: data
+          emptyDir: {}

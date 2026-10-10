@@ -3,8 +3,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ./gatus.yaml
+  - ./deployment.yaml
+  - ./pvc.yaml
+  - ./service.yaml
+  - ./servicemonitor.yaml
   - ./httproute.yaml
+  - ./httproutefilter.yaml
 # Hashed name: a config change rolls the pod by itself.
 configMapGenerator:
   - name: gatus-config

@@ -1,0 +1,13 @@
+---
+# The stable Service (and web-service-canary.yaml): Argo Rollouts points each at its
+# version's pods (it adds the rollouts-pod-template-hash selector) and the gateway weighs
+# them on the HTTPRoute (web-httproute.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop-web
+spec:
+  selector:
+    app: shop-web
+  ports:
+    - {name: http, port: 80, targetPort: http}

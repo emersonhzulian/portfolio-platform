@@ -7,6 +7,7 @@ kind: Namespace
 metadata:
   name: portfolio
   annotations:
-    # Opt-in for Chaos Mesh (it only targets annotated namespaces): the scheduled experiments
-    # in ../../apps/chaos kill pods here to show the apps ride through it.
+    # Opt-in for Chaos Mesh. It runs with enableFilterNamespace (hosting cluster's repository),
+    # so it only selects pods in namespaces with this annotation; without it, the scheduled
+    # experiments in ../../apps/chaos would find nothing to kill.
     chaos-mesh.org/inject: enabled

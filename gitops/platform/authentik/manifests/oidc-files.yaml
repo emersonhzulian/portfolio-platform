@@ -1,0 +1,21 @@
+---
+# portfolio-files (blueprints/files.yaml): the gateway's OIDC client in front of FileBrowser.
+# Envoy Gateway reads the key `client-secret`; authentik reads FILES_OIDC_CLIENT_SECRET.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: files-oidc
+spec:
+  refreshPolicy: CreatedOnce
+  target:
+    name: files-oidc
+    template:
+      data:
+        FILES_OIDC_CLIENT_SECRET: "{{ .password }}"
+        client-secret: "{{ .password }}"
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: authentik-client-secret

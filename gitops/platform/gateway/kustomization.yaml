@@ -8,4 +8,5 @@ resources:
   - ./certificate.yaml
   - ./envoyproxy.yaml
   - ./gateway.yaml
-  - ./trafficpolicies.yaml
+  - ./clienttrafficpolicy.yaml
+  - ./backendtrafficpolicy.yaml

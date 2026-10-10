@@ -1,7 +1,7 @@
 ---
 # Portfolio copy of the cluster's Loki setup (7d retention, OTLP ingestion); only ever holds
 # logs from the portfolio namespace.
-# Helm values for the loki chart (source and version: ../apps/loki.yaml).
+# Helm values for the loki chart (source and version: ../../argocd/observability/loki.yaml).
 deploymentMode: SingleBinary
 # The chart's default ClusterRole is named `loki-clusterrole` regardless of namespace and
 # is already owned by the central Loki release; a namespaced Role avoids the clash.

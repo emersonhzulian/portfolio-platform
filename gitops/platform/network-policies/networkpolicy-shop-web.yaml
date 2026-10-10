@@ -1,0 +1,23 @@
+---
+# The shop's storefront, reached through the gateways (shop.emersonzulian.dev).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: shop-web
+spec:
+  podSelector:
+    matchLabels:
+      app: shop-web
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+      ports:
+        - port: 3000
+          protocol: TCP

@@ -1,6 +1,6 @@
 # FileBrowser's OIDC client: the gateway (Envoy Gateway's OIDC filter) logs visitors in with it
 # before files.emersonzulian.dev reaches FileBrowser. Client secret: env FILES_OIDC_CLIENT_SECRET
-# (oidc-clients.yaml).
+# (../oidc-client-secrets.yaml).
 version: 1
 metadata:
   name: Portfolio - files

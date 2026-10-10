@@ -1,0 +1,36 @@
+---
+# The public Kafka UI: reached by the gateways (and scraped by Prometheus); talks to nothing but
+# the broker's authenticated listener (9093, KafkaUser kafka-ui, read-only ACLs) - not the
+# anonymous in-namespace one (9092), not Redis, not the databases.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-ui
+spec:
+  podSelector:
+    matchLabels:
+      app: kafka-ui
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/name: portfolio-kafka
+      ports:
+        - port: 9093
+          protocol: TCP

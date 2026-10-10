@@ -3,11 +3,25 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ./secrets.yaml
-  - ./database.yaml
-  - ./payments.yaml
-  - ./orders.yaml
-  - ./web.yaml
+  - ./secrets-password-generator.yaml
+  - ./secrets-db-payments.yaml
+  - ./secrets-webhook.yaml
+  - ./database-cluster.yaml
+  - ./database-payments.yaml
+  - ./database-podmonitor.yaml
+  - ./payments-deployment.yaml
+  - ./payments-service.yaml
+  - ./payments-pdb.yaml
+  - ./orders-rollout.yaml
+  - ./orders-service.yaml
+  - ./orders-pdb.yaml
+  - ./web-rollout.yaml
+  - ./web-service.yaml
+  - ./web-service-canary.yaml
+  - ./web-pdb.yaml
+  - ./web-httproute.yaml
   - ./analysis.yaml
-  - ./receipts.yaml
+  - ./receipts-deployment.yaml
+  - ./receipts-pvc.yaml
+  - ./receipts-pdb.yaml
   - ./reset.yaml

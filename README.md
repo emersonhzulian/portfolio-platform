@@ -166,7 +166,7 @@ The cluster provides these operators; this folder doesn't install them.
 | [grafana-operator](https://grafana.github.io/grafana-operator) | 5.25.0 | `Grafana`, `GrafanaDatasource`, `GrafanaDashboard` (with `publicSharing`) |
 | [Kyverno](https://kyverno.io) | 1.19.1 (chart 3.9.1) | `NamespacedValidatingPolicy` / `NamespacedMutatingPolicy` (CEL); its webhooks only watch this namespace |
 | [Argo Rollouts](https://argoproj.github.io/rollouts) + Gateway API plugin | 1.10.0 (chart 2.43.6), plugin 0.17.0 | Canary releases with metric analysis, traffic split on the HTTPRoute |
-| [Chaos Mesh](https://chaos-mesh.org) | 2.8.4 | Scheduled pod kills; only namespaces annotated `chaos-mesh.org/inject=enabled` |
+| [Chaos Mesh](https://chaos-mesh.org) | 2.8.4 | Scheduled pod kills; installed with `enableFilterNamespace`, so it only selects pods in namespaces annotated `chaos-mesh.org/inject=enabled` (only `portfolio` is) |
 | [Strimzi](https://strimzi.io) | 1.2.0 | `Kafka`, `KafkaNodePool`, `KafkaTopic` |
 | [CloudNativePG](https://cloudnative-pg.io) | 1.30.1 | `Cluster`, `Database` |
 
@@ -242,7 +242,7 @@ visitors see it at `/d/<uid>`.
 
 | Layer | Limit | Where |
 |---|---|---|
-| Gateway | per visitor IP (from `CF-Connecting-IP`): 60/min `/api/ds/query`, 120/min `/api/datasources`, 600/min overall; global (counted in Redis) | `gitops/platform/gateway/trafficpolicies.yaml` |
+| Gateway | per visitor IP (from `CF-Connecting-IP`): 60/min `/api/ds/query`, 120/min `/api/datasources`, 600/min overall; global (counted in Redis) | `gitops/platform/gateway/backendtrafficpolicy.yaml` |
 | Grafana | 30 s per datasource request, 1000 log lines per query | `gitops/observability/grafana/` |
 | Prometheus | 30 s timeout, 4 concurrent queries, 5M samples per query | `gitops/observability/prometheus/prometheus.yaml` |
 | Loki | 30 s timeout, 7 days range, 500 series, 5000 lines, parallelism 4 | `gitops/observability/loki/values.yaml` |
@@ -255,15 +255,15 @@ limits and the pods' memory limits keep any damage inside this namespace's own s
 
 1. Add a folder under `gitops/apps/` with the app's manifests, in the `portfolio` namespace. If the
    app is reached through the gateway, add its `app` label to `from-gateways` in
-   `gitops/platform/network-policies/networkpolicy.yaml`. If it calls anything outside the
+   `gitops/platform/network-policies/networkpolicy-from-gateways.yaml`. If it calls anything outside the
    namespace, give it its own egress rule there: a `NetworkPolicy` when selectors or an IP
-   block can say it, `ciliumnetworkpolicy.yaml` for a hostname (also add the app to
+   block can say it, `ciliumnetworkpolicy-egress-by-hostname.yaml` for a hostname (also add the app to
    `dns-proxy`) or the API server.
 2. Add an `HTTPRoute` on `Gateway/portfolio` with the annotation
    `external-dns.alpha.kubernetes.io/cloudflare: "true"`.
 3. Label the pod template `portfolio.emersonzulian.dev/instrument: dotnet` (or `nodejs`): a
    Kyverno policy turns it into the OpenTelemetry operator's inject annotation on each pod
-   (`gitops/platform/policies/instrumentation.yaml`). If the container sets `runAsNonRoot`, also set a numeric
+   (`gitops/platform/policies/auto-instrumentation.yaml`). If the container sets `runAsNonRoot`, also set a numeric
    `runAsUser`: the injected init container inherits the app's securityContext, and its
    image runs as root.
 4. Add an Application for it in `gitops/argocd/apps/`.

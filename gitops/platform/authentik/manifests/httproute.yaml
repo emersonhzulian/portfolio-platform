@@ -31,15 +31,3 @@ spec:
             group: gateway.envoyproxy.io
             kind: HTTPRouteFilter
             name: authentik-not-found
----
-apiVersion: gateway.envoyproxy.io/v1alpha1
-kind: HTTPRouteFilter
-metadata:
-  name: authentik-not-found
-spec:
-  directResponse:
-    statusCode: 404
-    contentType: text/plain
-    body:
-      type: Inline
-      inline: "Not Found"

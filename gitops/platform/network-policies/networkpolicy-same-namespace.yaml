@@ -1,0 +1,19 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: same-namespace
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: NotIn
+        values: [grafana, kafka-ui, filebrowser]
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Anything from inside the namespace (Grafana included, as a client of the datasources).
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}

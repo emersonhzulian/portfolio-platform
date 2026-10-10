@@ -1,0 +1,15 @@
+---
+# Only what the gateway-httproute source reads: Gateways/HTTPRoutes, and namespaces to
+# evaluate the Gateway's allowedRoutes. It is a ClusterRole because external-dns lists
+# these cluster-wide; it can't change anything in the cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: portfolio-external-dns
+rules:
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch]
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [gateways, httproutes]
+    verbs: [get, list, watch]

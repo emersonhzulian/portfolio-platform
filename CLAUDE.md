@@ -15,7 +15,7 @@ namespace of my homelab cluster; `shop/` is the source of the app that runs on i
 - **Every folder under `gitops/{platform,observability,apps}` is one Argo CD Application**,
   declared in `gitops/argocd/<group>/` and listed in that folder's `kustomization.yaml`.
 - **Network:** the namespace is default-deny both ways. Native `NetworkPolicy` first
-  (`gitops/platform/network-policies/networkpolicy.yaml`); `ciliumnetworkpolicy.yaml` only for
+  (`gitops/platform/network-policies/networkpolicy-*.yaml`); `ciliumnetworkpolicy-*.yaml` only for
   egress by hostname (add the app to `dns-proxy`), the API server and the kubelets.
 - **Policies (Kyverno, CEL):** pods get the node-pool `nodeSelector` automatically, and the
   OpenTelemetry agent when labelled `portfolio.emersonzulian.dev/instrument: dotnet|nodejs`;

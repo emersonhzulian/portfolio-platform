@@ -1,0 +1,11 @@
+---
+# The canary Service: the new version's pods during a release (see web-service.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop-web-canary
+spec:
+  selector:
+    app: shop-web
+  ports:
+    - {name: http, port: 80, targetPort: http}

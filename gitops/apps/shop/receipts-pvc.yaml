@@ -1,0 +1,13 @@
+---
+# The receipts, one folder per visitor (users/<name>). Shared: receipts writes them, FileBrowser
+# (../files) serves them - hence NFS (ReadWriteMany), unlike the block volumes elsewhere.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shop-receipts
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: freenas-nfs-csi
+  resources:
+    requests:
+      storage: 1Gi

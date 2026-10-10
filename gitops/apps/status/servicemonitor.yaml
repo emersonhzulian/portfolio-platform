@@ -1,0 +1,15 @@
+---
+# Gatus' own metrics (results, response times) - lets Grafana chart uptime next to everything else.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gatus
+  labels:
+    prometheus.homelab/instance: portfolio # skipped by the central Prometheus
+spec:
+  endpoints:
+    - port: http
+      interval: 60s
+  selector:
+    matchLabels:
+      app: gatus

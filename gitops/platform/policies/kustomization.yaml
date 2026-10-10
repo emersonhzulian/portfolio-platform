@@ -2,7 +2,24 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# Workload rules for this namespace, in CEL - the same language and shape as a Kubernetes
+# ValidatingAdmissionPolicy, with Kyverno adding what the native one lacks here: namespaced
+# policies (so they live in this folder and show up in Argo CD), background scans and
+# PolicyReports.
+#
+# All of them deny. Each started in Audit - violations in PolicyReports (and on the platform
+# dashboard), nothing blocked - and was flipped once what it reported was fixed; a new rule
+# should take the same path. Background scans keep reporting on running pods either way.
+#
+# Rules are written against Pods; autogen applies them to the pod templates of Deployments,
+# StatefulSets, DaemonSets, Jobs and CronJobs too, so a bad manifest is refused when Argo CD
+# applies it, not later when its pods fail to start.
 resources:
-  - ./scheduling.yaml
-  - ./instrumentation.yaml
-  - ./workloads.yaml
+  - ./node-pool.yaml
+  - ./auto-instrumentation.yaml
+  - ./disallow-mutable-tags.yaml
+  - ./allowed-registries.yaml
+  - ./require-resources.yaml
+  - ./require-readiness-probe.yaml
+  - ./require-non-root.yaml
+  - ./require-app-name-label.yaml
