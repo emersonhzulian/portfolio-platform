@@ -18,6 +18,14 @@ spec:
   oidc:
     provider:
       issuer: https://auth.emersonzulian.dev/application/o/portfolio-files/
+      # Spelled out so Envoy Gateway never fetches the discovery document: it only does so
+      # when building config, treats a 404 as permanent and doesn't retry until some other
+      # resource changes. An authentik restart (blueprints still creating the provider) left
+      # this route answering 500 long after authentik was back. With the endpoints here, an
+      # authentik outage only fails logins while it lasts.
+      authorizationEndpoint: https://auth.emersonzulian.dev/application/o/authorize/
+      tokenEndpoint: https://auth.emersonzulian.dev/application/o/token/
+      endSessionEndpoint: https://auth.emersonzulian.dev/application/o/portfolio-files/end-session/
     clientID: portfolio-files
     # Generated on authentik's side (../../platform/authentik/manifests/oidc-files.yaml).
     clientSecret:
