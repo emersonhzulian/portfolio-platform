@@ -6,6 +6,10 @@ authentik:
   log_level: info
   error_reporting:
     enabled: false
+  # AUTHENTIK_WEB__BASE_URL: the public URL links and redirects are built from.
+  # Unset only raises a configuration warning today; a future release requires it.
+  web:
+    base_url: https://auth.emersonzulian.dev
   # CloudNativePG cluster in manifests/database.yaml; the password comes from the Secret
   # cnpg generates (global.env below), the rest isn't secret.
   postgresql:
