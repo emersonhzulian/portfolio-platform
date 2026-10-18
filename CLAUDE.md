@@ -27,7 +27,7 @@ namespace of my homelab cluster; `shop/` is the source of the app that runs on i
   `matchLabelKeys: [pod-template-hash]` (`rollouts-pod-template-hash` for a Rollout, which also
   needs `OTEL_SERVICE_NAME` pinned - the operator would name it after the ReplicaSet). Size
   requests from measured use, not from the limit.
-- **ServiceMonitors/PodMonitors** carry `prometheus.homelab/instance: portfolio` (the cluster's
+- **ServiceMonitors/PodMonitors/PrometheusRules** carry `prometheus.homelab/instance: portfolio` (the cluster's
   central Prometheus skips them).
 - **Before pushing:** `kubectl kustomize` every changed folder from a clean checkout (an
   uncommitted file referenced by a kustomization breaks a whole Argo CD group). Commit before

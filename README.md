@@ -133,7 +133,7 @@ and Tempo are Helm charts; their folders hold only `values.yaml`.
 | | `platform-kafka` (1) | Kafka (Strimzi, KRaft, one node) and the `order.paid` topics |
 | | `platform-redis` (1) | Redis: sessions, per-user and gateway (global) rate limits |
 | | `platform-authentik` (2) | authentik (chart + CloudNativePG database), sign-up flow, demo account, OIDC clients |
-| observability (1) | `observability-prometheus` (0) | Prometheus; container metrics from kubelet / kube-state-metrics filtered to this namespace, plus an allowlist federated from the central Prometheus (Argo CD, Flux, cert-manager, edge Envoy) |
+| observability (1) | `observability-prometheus` (0) | Prometheus; container metrics from kubelet / kube-state-metrics filtered to this namespace, plus an allowlist federated from the central Prometheus (Argo CD, Flux, cert-manager, edge Envoy); its alert rules go to the cluster's Alertmanager |
 | | `observability-loki` (0) | Loki, 7 days |
 | | `observability-tempo` (0) | Tempo, 7 days; span metrics written to Prometheus |
 | | `observability-opentelemetry` (1) | OTLP collector, node log shipper, auto-instrumentation config |
@@ -181,14 +181,19 @@ The cluster also has to provide:
 - the GatewayClass `envoy-gateway`;
 - the `kube-state-metrics` Service in `observability` and the kubelet Service
   `kube-prometheus-stack-kubelet` in `kube-system`;
+- the Alertmanager Service `kube-prometheus-stack-alertmanager` (port `http-web`) in
+  `observability`, which receives this Prometheus's alerts;
 - the namespace `opentelemetry`, labelled `pod-security.kubernetes.io/enforce: privileged`,
   for the node log shipper;
 - nodes labelled `portfolio.emersonzulian.dev/pool: "true"` (the pool every pod here is pinned to);
 - Envoy Gateway configured with a Redis backend for global rate limits (this folder's Redis).
 
-The central Prometheus must also skip ServiceMonitors labelled
-`prometheus.homelab/instance: portfolio`, or it scrapes their targets twice. Every
-ServiceMonitor in this folder carries that label (Loki and Tempo through their values).
+The central Prometheus must also skip ServiceMonitors, PodMonitors and PrometheusRules labelled
+`prometheus.homelab/instance: portfolio`, or it scrapes their targets twice (and the network
+policy drops the second scrape) or evaluates the rules on data it doesn't have. Every one in
+this folder carries that label (Loki and Tempo through their values). The cluster reads this
+Prometheus in place instead: its Grafana (namespace `observability`, `app: grafana`) may query
+it on 9090.
 
 ### Secrets (OpenBao, KV v2 mount `secret/`)
 

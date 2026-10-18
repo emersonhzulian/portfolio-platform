@@ -1,0 +1,35 @@
+---
+# Alerts on this Prometheus's own data, sent to the cluster's Alertmanager (spec.alerting in
+# prometheus.yaml). Pod-level health (crash loops, PVCs filling up, failed jobs) already comes
+# from the central Prometheus's kubelet/kube-state-metrics; these cover what only this one sees.
+# The label keeps the central Prometheus from loading the rules on data it doesn't have.
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: portfolio
+  labels:
+    prometheus.homelab/instance: portfolio
+spec:
+  groups:
+    - name: portfolio
+      rules:
+        # Any scrape target here (databases, Kafka, Redis, authentik, Loki, Tempo...) or the
+        # federation from the central Prometheus (job="platform").
+        - alert: PortfolioTargetDown
+          expr: up == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Portfolio target {{ $labels.job }} is down"
+            description: "{{ $labels.instance }} ({{ $labels.job }}) hasn't answered a scrape for 10 minutes."
+        # The exporter answers but can't reach Postgres.
+        - alert: PortfolioPostgresDown
+          expr: cnpg_collector_up == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Postgres {{ $labels.cluster }} is down"
+            description: "The CloudNativePG exporter on {{ $labels.pod }} can't reach Postgres."

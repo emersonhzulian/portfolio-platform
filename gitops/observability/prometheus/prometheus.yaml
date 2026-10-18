@@ -30,6 +30,19 @@ spec:
   podMonitorNamespaceSelector:
     matchLabels:
       kubernetes.io/metadata.name: portfolio
+  # Alert rules on this Prometheus's own data (prometheusrule-*.yaml), sent to the cluster's
+  # Alertmanager: one place for the homelab's and the portfolio's alerts. They carry the
+  # operator's external label prometheus="portfolio/portfolio".
+  ruleSelector: {}
+  ruleNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: portfolio
+  alerting:
+    alertmanagers:
+      - namespace: observability
+        name: kube-prometheus-stack-alertmanager
+        port: http-web
+        apiVersion: v2
   resources:
     requests:
       cpu: 100m

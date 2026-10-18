@@ -11,3 +11,4 @@ resources:
   - ./servicemonitor-cadvisor.yaml
   - ./servicemonitor-kube-state-metrics.yaml
   - ./servicemonitor-platform.yaml
+  - ./prometheusrule-portfolio.yaml
