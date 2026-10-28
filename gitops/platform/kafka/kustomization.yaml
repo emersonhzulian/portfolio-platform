@@ -5,8 +5,5 @@ kind: Kustomization
 resources:
   - ./kafkanodepool.yaml
   - ./kafka.yaml
-  - ./topic-order-paid.yaml
-  - ./topic-order-paid-dlq.yaml
-  - ./topic-receipt-ready.yaml
   - ./users.yaml
   - ./podmonitor.yaml

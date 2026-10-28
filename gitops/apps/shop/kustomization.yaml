@@ -10,6 +10,9 @@ resources:
   - ./database-payments.yaml
   - ./database-podmonitor.yaml
   - ./dashboard.yaml
+  - ./topic-order-paid.yaml
+  - ./topic-order-paid-dlq.yaml
+  - ./topic-receipt-ready.yaml
   - ./payments-deployment.yaml
   - ./payments-service.yaml
   - ./payments-pdb.yaml

@@ -131,7 +131,7 @@ and Tempo are Helm charts; their folders hold only `values.yaml`.
 | | `platform-cloudflare-tunnel` (1) | cloudflared, the only way in |
 | | `platform-policies` (0) | Kyverno policies (CEL): node-pool pinning, workload rules |
 | | `platform-external-dns` (1) | Proxied DNS record to the tunnel for each route |
-| | `platform-kafka` (1) | Kafka (Strimzi, KRaft, one node) and the `order.paid` topics |
+| | `platform-kafka` (1) | Kafka (Strimzi, KRaft, one node) and its users (SCRAM, ACLs) |
 | | `platform-redis` (1) | Redis: sessions, per-user and gateway (global) rate limits |
 | | `platform-authentik` (2) | authentik (chart + CloudNativePG database), sign-up flow, demo account, OIDC clients |
 | observability (1) | `observability-prometheus` (0) | Prometheus; container metrics from kubelet / kube-state-metrics filtered to this namespace, plus an allowlist federated from the central Prometheus (Argo CD, Flux, cert-manager, edge Envoy); its alert rules go to the cluster's Alertmanager |
@@ -141,7 +141,7 @@ and Tempo are Helm charts; their folders hold only `values.yaml`.
 | | `observability-grafana` (1) | Grafana, datasources, dashboards (overview + platform), public route, network policy |
 | apps (2) | `apps-landing` (0) | Static front page at the apex, two nginx replicas |
 | | `apps-status` (0) | Gatus: public endpoints probed from outside, Argo CD sync state, backends |
-| | `apps-shop` (0) | The shop ([source](shop/)): web (Next.js), orders and payments (.NET), receipts (Node.js), PostgreSQL, its dashboard |
+| | `apps-shop` (0) | The shop ([source](shop/)): web (Next.js), orders and payments (.NET), receipts (Node.js), PostgreSQL, its Kafka topics and dashboard |
 | | `apps-files` (0) | FileBrowser behind the gateway's OIDC (SecurityPolicy: authentik login + JWT → `X-Auth-User`), one folder per visitor, download only |
 | | `apps-kafka-ui` (0) | Kafbat UI: read-only in the UI and at the broker (SCRAM user with read-only ACLs) |
 | | `apps-chaos` (0) | Chaos Mesh schedule: one random shop pod killed every hour |
