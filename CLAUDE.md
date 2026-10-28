@@ -21,8 +21,8 @@ namespace of my homelab cluster; `shop/` is the source of the app that runs on i
 - **An app's own pieces live in its folder** (dashboard, network policy, monitors, Kafka
   topics). Exception: authentik blueprints and their client Secrets stay in
   `gitops/platform/authentik/`, which mounts and reads them. Moving a resource between Argo CD
-  apps can prune it first - anything stateful (KafkaTopic, PVC, database) gets
-  `argocd.argoproj.io/sync-options: Prune=false`, synced, before the move.
+  apps can prune it before the new app adopts it (each app polls on its own): a stateless one
+  just has a short gap, a stateful one (KafkaTopic, PVC, database) is deleted with its data.
 - **Policies (Kyverno, CEL):** pods get the node-pool `nodeSelector` automatically, and the
   OpenTelemetry agent when labelled `portfolio.emersonzulian.dev/instrument: dotnet|nodejs`;
   images must be pinned; pods need `app.kubernetes.io/name`; containers need requests, a memory
