@@ -80,7 +80,6 @@ flowchart LR
   subgraph cluster [Kubernetes - portfolio namespace]
     tunnel --> gw[Envoy Gateway<br/>TLS]
     gw --> grafana[Grafana<br/>read-only + Explore]
-    gw --> demo[Demo app<br/>.NET]
     gw --> argocd[Argo CD UI<br/>read-only]
     gw --> landing[Landing page]
     gw --> status[Gatus<br/>status page]
@@ -89,7 +88,7 @@ flowchart LR
     shop --> kafka[(Kafka)] & redis[(Redis)] & pg[(PostgreSQL)]
     gw -- global rate limit --> redis
     status -. probes from outside .-> cf
-    demo -- OTLP logs + traces --> otel[OpenTelemetry<br/>collector]
+    shop -- OTLP logs + traces --> otel[OpenTelemetry<br/>collector]
     otel --> loki[(Loki)]
     otel --> tempo[(Tempo)]
     tempo -- span metrics --> prom[(Prometheus)]
@@ -107,12 +106,14 @@ gitops/            Everything Argo CD applies
   platform.yaml      ├─ platform        namespace, gateway + TLS, network policies, policies,
                      │                    tunnel, DNS, Kafka, Redis, authentik
   observability.yaml ├─ observability   Prometheus, Loki, Tempo, OpenTelemetry, Grafana
-  apps.yaml          └─ apps            what runs on the platform: landing, status, shop, demo
+  apps.yaml          └─ apps            what runs on the platform: landing, status, shop, files,
+                                          Kafka UI, traffic, chaos
  platform/          namespace/  gateway/  network-policies/  policies/  cloudflare-tunnel/
                     external-dns/  kafka/  redis/  authentik/
  observability/     prometheus/  loki/  tempo/  opentelemetry/  grafana/
  apps/              landing/  status/  shop/  files/  kafka-ui/  traffic/  chaos/
-shop/              The shop's source: web/ (Next.js), orders/ and payments/ (.NET)
+shop/              The shop's source: web/ (Next.js), orders/ and payments/ (.NET),
+                   receipts/ (Node.js)
 .github/workflows/ CI: builds the shop's images to ghcr.io/emersonhzulian/portfolio-platform/*
 ```
 
@@ -140,7 +141,7 @@ and Tempo are Helm charts; their folders hold only `values.yaml`.
 | | `observability-grafana` (1) | Grafana, datasources, dashboards (overview + platform), public route, network policy |
 | apps (2) | `apps-landing` (0) | Static front page at the apex, two nginx replicas |
 | | `apps-status` (0) | Gatus: public endpoints probed from outside, Argo CD sync state, backends |
-| | `apps-shop` (0) | The shop ([source](shop/)): web (Next.js), orders and payments (.NET), PostgreSQL |
+| | `apps-shop` (0) | The shop ([source](shop/)): web (Next.js), orders and payments (.NET), receipts (Node.js), PostgreSQL, its dashboard |
 | | `apps-files` (0) | FileBrowser behind the gateway's OIDC (SecurityPolicy: authentik login + JWT → `X-Auth-User`), one folder per visitor, download only |
 | | `apps-kafka-ui` (0) | Kafbat UI: read-only in the UI and at the broker (SCRAM user with read-only ACLs) |
 | | `apps-chaos` (0) | Chaos Mesh schedule: one random shop pod killed every hour |
@@ -239,9 +240,12 @@ change `repoURL` in `gitops/argocd/**/*.yaml` and in the root Application.
 
 ### Adding a dashboard
 
-Add a `GrafanaDashboard` in `gitops/observability/grafana/` with the sync wave `"1"`,
-`resyncPeriod: 1m` and the instance selector `grafana.internal/instance: portfolio`. Anonymous
-visitors see it at `/d/<uid>`.
+A dashboard lives with what it shows: an app's own dashboard goes in the app's folder
+(`gitops/apps/shop/dashboard.yaml`); only the cross-cutting ones (overview, platform) stay in
+`gitops/observability/grafana/`. Give it `resyncPeriod: 1m` and the instance selector
+`grafana.internal/instance: portfolio`. Inside the Grafana folder it also needs the sync wave
+`"1"`, so it waits for the Grafana instance; an app's folder needs none, since the apps group
+syncs after observability. Anonymous visitors see it at `/d/<uid>`.
 
 ### Query limits
 
@@ -260,10 +264,12 @@ limits and the pods' memory limits keep any damage inside this namespace's own s
 
 1. Add a folder under `gitops/apps/` with the app's manifests, in the `portfolio` namespace. If the
    app is reached through the gateway, add its `app` label to `from-gateways` in
-   `gitops/platform/network-policies/networkpolicy-from-gateways.yaml`. If it calls anything outside the
-   namespace, give it its own egress rule there: a `NetworkPolicy` when selectors or an IP
-   block can say it, `ciliumnetworkpolicy-egress-by-hostname.yaml` for a hostname (also add the app to
-   `dns-proxy`) or the API server.
+   `gitops/platform/network-policies/networkpolicy-from-gateways.yaml` (or, on another port
+   or with a narrower policy, a `networkpolicy.yaml` in the app's own folder). If it calls
+   anything outside the namespace, give it its own egress rule: a `NetworkPolicy` in the app's
+   folder when selectors or an IP block can say it,
+   `gitops/platform/network-policies/ciliumnetworkpolicy-egress-by-hostname.yaml` for a
+   hostname (also add the app to `dns-proxy`) or the API server.
 2. Add an `HTTPRoute` on `Gateway/portfolio` with the annotation
    `external-dns.alpha.kubernetes.io/cloudflare: "true"`.
 3. Label the pod template `portfolio.emersonzulian.dev/instrument: dotnet` (or `nodejs`): a

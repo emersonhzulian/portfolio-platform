@@ -10,7 +10,6 @@ resources:
   - ./datasource-tempo.yaml
   - ./dashboard.yaml
   - ./dashboard-platform.yaml
-  - ./dashboard-shop.yaml
   - ./httproutefilter.yaml
   - ./httproute.yaml
   - ./networkpolicy.yaml

@@ -3,13 +3,13 @@
 # lag and DLQ, replicas through the hourly chaos kill, and - with the `user` variable - one
 # visitor's traces and logs. The web app's "See all of it in Grafana" opens it with
 # ?var-user=<their username>. Anonymous visitors see it at /d/portfolio-shop.
+# No sync wave: the apps group syncs after observability, so Grafana is already up - and a
+# wave here would hold the dashboard back until every shop Rollout is healthy.
 # yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/grafana.integreatly.org/grafanadashboard_v1beta1.json
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
   name: portfolio-shop
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
 spec:
   resyncPeriod: 1m
   instanceSelector:

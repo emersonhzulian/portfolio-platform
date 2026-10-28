@@ -11,11 +11,15 @@ kind: Kustomization
 #   - Inside the namespace, pods talk freely (apps -> collector -> Loki/Tempo -> Prometheus).
 #     The namespace is the trust boundary (networkpolicy-same-namespace.yaml).
 #   - Grafana and the Kafka UI are exceptions: both are public tools visitors drive, so each
-#     keeps its own, narrower policy (Grafana: ../../observability/grafana/networkpolicy.yaml,
-#     Kafka UI: networkpolicy-kafka-ui.yaml) and is left out of `same-namespace`. FileBrowser
-#     too (networkpolicy-filebrowser.yaml): it trusts the X-Auth-User header the gateway sets,
-#     so nothing but the gateway may reach it. Policies only ever add allows, so selecting them
-#     there would widen what they can reach.
+#     keeps its own, narrower policy (../../observability/grafana/networkpolicy.yaml,
+#     ../../apps/kafka-ui/networkpolicy.yaml) and is left out of `same-namespace`. FileBrowser
+#     too (../../apps/files/networkpolicy.yaml): it trusts the X-Auth-User header the gateway
+#     sets, so nothing but the gateway may reach it. Policies only ever add allows, so selecting
+#     them there would widen what they can reach.
+#
+# What lives where: this folder holds the boundary and the policies shared by several apps
+# (from-gateways, egress-by-hostname, dns-proxy, ...). A policy that selects one app only lives
+# in that app's folder (e.g. ../../apps/shop/web-networkpolicy.yaml), next to what it protects.
 #
 # Plain Kubernetes NetworkPolicy (networkpolicy-*.yaml) wherever it can say it. Cilium's own
 # policy (ciliumnetworkpolicy-*.yaml) only for what NetworkPolicy can't express:
@@ -39,9 +43,6 @@ resources:
   - ./networkpolicy-redis.yaml
   - ./networkpolicy-authentik.yaml
   - ./networkpolicy-cloudnative-pg.yaml
-  - ./networkpolicy-shop-web.yaml
-  - ./networkpolicy-kafka-ui.yaml
-  - ./networkpolicy-filebrowser.yaml
   - ./ciliumnetworkpolicy-dns-proxy.yaml
   - ./ciliumnetworkpolicy-egress-by-hostname.yaml
   - ./ciliumnetworkpolicy-kube-apiserver.yaml

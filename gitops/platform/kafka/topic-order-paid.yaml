@@ -6,6 +6,10 @@ metadata:
   name: order.paid
   labels:
     strimzi.io/cluster: portfolio
+  annotations:
+    # Never pruned by Argo CD: deleting the CR deletes the topic and its events. Removing
+    # it from Git leaves the topic in place; delete it by hand.
+    argocd.argoproj.io/sync-options: Prune=false
 spec:
   partitions: 3
   replicas: 1

@@ -14,9 +14,15 @@ namespace of my homelab cluster; `shop/` is the source of the app that runs on i
   A change here can't widen what the AppProjects allow.
 - **Every folder under `gitops/{platform,observability,apps}` is one Argo CD Application**,
   declared in `gitops/argocd/<group>/` and listed in that folder's `kustomization.yaml`.
-- **Network:** the namespace is default-deny both ways. Native `NetworkPolicy` first
-  (`gitops/platform/network-policies/networkpolicy-*.yaml`); `ciliumnetworkpolicy-*.yaml` only for
-  egress by hostname (add the app to `dns-proxy`), the API server and the kubelets.
+- **Network:** the namespace is default-deny both ways. Native `NetworkPolicy` first;
+  `ciliumnetworkpolicy-*.yaml` only for egress by hostname (add the app to `dns-proxy`), the API
+  server and the kubelets. Shared policies live in `gitops/platform/network-policies/`; one that
+  selects a single app lives in that app's folder.
+- **An app's own pieces live in its folder** (dashboard, network policy, monitors, Kafka
+  topics). Exception: authentik blueprints and their client Secrets stay in
+  `gitops/platform/authentik/`, which mounts and reads them. Moving a resource between Argo CD
+  apps can prune it first - anything stateful (KafkaTopic, PVC, database) gets
+  `argocd.argoproj.io/sync-options: Prune=false`, synced, before the move.
 - **Policies (Kyverno, CEL):** pods get the node-pool `nodeSelector` automatically, and the
   OpenTelemetry agent when labelled `portfolio.emersonzulian.dev/instrument: dotnet|nodejs`;
   images must be pinned; pods need `app.kubernetes.io/name`; containers need requests, a memory

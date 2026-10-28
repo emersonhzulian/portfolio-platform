@@ -1,6 +1,6 @@
 ---
 # FileBrowser trusts X-Auth-User, which the gateway writes from a verified authentik token
-# (apps/files/security.yaml). So the gateway is the only thing allowed to reach it: from any
+# (security.yaml). So the gateway is the only thing allowed to reach it: from any
 # other pod, that header would be a forgeable login.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

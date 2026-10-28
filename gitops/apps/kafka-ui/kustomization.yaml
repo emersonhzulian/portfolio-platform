@@ -8,6 +8,7 @@ resources:
   - ./servicemonitor.yaml
   - ./httproute.yaml
   - ./httproutefilter.yaml
+  - ./networkpolicy.yaml
 # Hashed name: a config change rolls the pod by itself.
 configMapGenerator:
   - name: kafka-ui-config

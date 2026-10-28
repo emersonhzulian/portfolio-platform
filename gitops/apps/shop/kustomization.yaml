@@ -9,6 +9,7 @@ resources:
   - ./database-cluster.yaml
   - ./database-payments.yaml
   - ./database-podmonitor.yaml
+  - ./dashboard.yaml
   - ./payments-deployment.yaml
   - ./payments-service.yaml
   - ./payments-pdb.yaml
@@ -20,6 +21,7 @@ resources:
   - ./web-service-canary.yaml
   - ./web-pdb.yaml
   - ./web-httproute.yaml
+  - ./web-networkpolicy.yaml
   - ./analysis.yaml
   - ./receipts-deployment.yaml
   - ./receipts-pvc.yaml
